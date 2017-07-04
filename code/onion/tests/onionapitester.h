@@ -12,6 +12,9 @@ public:
 private slots:
     // test methods here
     void testBuildTunnel();
+    void testDestroyTunnel();
+    void testSendTunnel();
+    void testBuildCoverTunnel();
 
 };
 

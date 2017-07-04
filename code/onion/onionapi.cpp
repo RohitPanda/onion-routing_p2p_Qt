@@ -84,7 +84,6 @@ void OnionApi::onConnection()
 
 void OnionApi::onData(QTcpSocket *socket)
 {
-    qDebug() << "got data from" << socket->peerAddress();
     QByteArray &buffer = buffers_[socket]; // does auto-insert
     buffer.append(socket->readAll());
 
@@ -100,6 +99,9 @@ void OnionApi::onData(QTcpSocket *socket)
     quint16 size, messageTypeInt;
     stream >> size;
     stream >> messageTypeInt;
+
+    qDebug() << "got data from" << socket->peerAddress() << "->" << size
+             << "bytes, type" << messageTypeInt << buffer.size() << "bytes in buffer";
 
     if(size > buffer.size()) {
         // wait for more data
