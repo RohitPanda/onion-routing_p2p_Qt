@@ -1,6 +1,9 @@
 QT += core network
 QT -= gui
 
+# uncomment here to build tests
+#CONFIG += test
+
 CONFIG += c++11
 
 TARGET = onion
@@ -9,7 +12,7 @@ CONFIG -= app_bundle
 
 TEMPLATE = app
 
-SOURCES += main.cpp \
+SOURCES += \
     controller.cpp \
     peertopeer.cpp \
     settings.cpp \
@@ -31,4 +34,23 @@ HEADERS += \
     peertopeer.h \
     settings.h \
     binding.h \
-    onionapi.h
+    onionapi.h \
+    messagetypes.h
+
+test{
+#    message(Configuring test build...)
+
+    TEMPLATE = app
+    TARGET = oniontest
+
+    QT += testlib
+
+    SOURCES += \
+        tests/onionapitester.cpp \
+        test.cpp
+
+    HEADERS += \
+        tests/onionapitester.h
+} else {
+    SOURCES += main.cpp
+}

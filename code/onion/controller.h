@@ -1,21 +1,23 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
+#include <QObject>
 #include "onionapi.h"
 #include "peertopeer.h"
 #include "settings.h"
 
-class Controller
+class Controller : public QObject
 {
+    Q_OBJECT
 public:
-    Controller(QString configFile);
+    explicit Controller(QString configFile);
 
     bool start();
 
 private:
     void readHostkey(QString file);
 
-    OnionApi api_;
+    OnionApi onionApi_;
     PeerToPeer p2p_;
 
     QByteArray hostkey_;

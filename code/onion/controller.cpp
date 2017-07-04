@@ -22,8 +22,42 @@ bool Controller::start()
     // validate our hostkey
     readHostkey(settings_.hostkeyFile());
 
-    // TODO get parameters, setup api and p2p
-    // TODO make api for RPS, get peers and establish connection to them
+    // setup onion api
+    onionApi_.setBinding(settings_.onionApiAddress());
+
+    // TODO setup p2p
+
+    bool debugOnion = true;
+    if(debugOnion) {
+        connect(&onionApi_, &OnionApi::requestBuildCoverTunnel, [=](quint16 b) {
+            qDebug() << "OnionApi::requestBuildCoverTunnel(" << b << ")";
+        });
+        connect(&onionApi_, &OnionApi::requestBuildTunnel, [=](QHostAddress peer, quint16 port, QByteArray hostkey) {
+            qDebug().noquote() << "OnionApi::requestBuildTunnel(" << peer.toString() << ":" << port << ")"
+                               << "\nkey:" << hostkey.toHex();
+        });
+        connect(&onionApi_, &OnionApi::requestDestroyTunnel, [=](quint32 tunnelId) {
+            qDebug() << "OnionApi::requestDestroyTunnel(" << tunnelId << ")";
+        });
+        connect(&onionApi_, &OnionApi::requestSendTunnel, [=](quint32 tunnelId, QByteArray data) {
+            qDebug() << "OnionApi::requestSendTunnel(" << tunnelId << ")\ndata:" << data.toHex();
+        });
+    }
+
+    // TODO make api for RPS
+    // TODO get peers from RPS
+
+    // start everything
+    if(onionApi_.start()) {
+        qDebug() << "onion api running on" << settings_.onionApiAddress().toString();
+    } else {
+        qDebug() << "could not start onion api:" << onionApi_.socketError();
+        return false;
+    }
+
+    // TODO start p2p
+    // TODO connect p2p
+
     return true;
 }
 
