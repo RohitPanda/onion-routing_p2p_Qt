@@ -11,9 +11,9 @@ TEMPLATE = app
 
 SOURCES += main.cpp \
     controller.cpp \
-    api.cpp \
     peertopeer.cpp \
-    settings.cpp
+    settings.cpp \
+    onionapi.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -28,6 +28,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 HEADERS += \
     controller.h \
-    api.h \
     peertopeer.h \
-    settings.h
+    settings.h \
+    binding.h \
+    onionapi.h

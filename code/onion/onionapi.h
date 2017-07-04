@@ -5,11 +5,11 @@
 #include <QTcpServer>
 
 // represents the local api connection that we host for other modules
-class Api : public QObject
+class OnionApi : public QObject
 {
     Q_OBJECT
 public:
-    explicit Api(QObject *parent = 0);
+    explicit OnionApi(QObject *parent = 0);
 
     int port() const;
     void setPort(int port);

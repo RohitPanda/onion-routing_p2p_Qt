@@ -1,7 +1,7 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include "api.h"
+#include "onionapi.h"
 #include "peertopeer.h"
 #include "settings.h"
 
@@ -10,12 +10,17 @@ class Controller
 public:
     Controller(QString configFile);
 
-    void start();
+    bool start();
 
 private:
-    Api api_;
+    void readHostkey(QString file);
+
+    OnionApi api_;
     PeerToPeer p2p_;
 
+    QByteArray hostkey_;
+
+    QString settingsFile_;
     Settings settings_;
 };
 

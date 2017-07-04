@@ -1,38 +1,38 @@
-#include "api.h"
+#include "onionapi.h"
 
 #include <QTcpSocket>
 
-Api::Api(QObject *parent) : QObject(parent), server_(this)
+OnionApi::OnionApi(QObject *parent) : QObject(parent), server_(this)
 {
-    connect(&server_, &QTcpServer::newConnection, this, &Api::onConnection);
+    connect(&server_, &QTcpServer::newConnection, this, &OnionApi::onConnection);
 }
 
-int Api::port() const
+int OnionApi::port() const
 {
     return port_;
 }
 
-void Api::setPort(int port)
+void OnionApi::setPort(int port)
 {
     port_ = port;
 }
 
-QHostAddress Api::interface() const
+QHostAddress OnionApi::interface() const
 {
     return interface_;
 }
 
-void Api::setInterface(const QHostAddress &interface)
+void OnionApi::setInterface(const QHostAddress &interface)
 {
     interface_ = interface;
 }
 
-bool Api::start()
+bool OnionApi::start()
 {
     return server_.listen(interface_, port_);
 }
 
-void Api::onConnection()
+void OnionApi::onConnection()
 {
     while (server_.hasPendingConnections()) {
         QTcpSocket *socket = server_.nextPendingConnection();
@@ -56,7 +56,7 @@ void Api::onConnection()
     }
 }
 
-void Api::onData(QTcpSocket *socket)
+void OnionApi::onData(QTcpSocket *socket)
 {
     qDebug() << "got data from" << socket->peerAddress();
     QByteArray &buffer = buffers_[socket]; // does auto-insert

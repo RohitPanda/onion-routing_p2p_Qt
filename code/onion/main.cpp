@@ -33,7 +33,9 @@ int main(int argc, char *argv[])
     qDebug() << "loading config from" << configfile;
 
     Controller controller(configfile);
-    controller.start();
+    if(!controller.start()) {
+        return -1;
+    }
 
     return a.exec();
 }
