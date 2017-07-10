@@ -10,6 +10,10 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
+    // meta type setup
+    qRegisterMetaType<QHostAddress>();
+
+
     QStringList args = a.arguments();
     args.removeFirst(); // program name
 

@@ -3,18 +3,10 @@
 #include <QTcpSocket>
 #include <QHostAddress>
 #include <QDataStream>
-#include "messagetypes.h"
 
 OnionApi::OnionApi(QObject *parent) : QObject(parent), server_(this)
 {
     connect(&server_, &QTcpServer::newConnection, this, &OnionApi::onConnection);
-
-
-    static bool initmetatypes = false;
-    if(!initmetatypes) {
-        initmetatypes = true;
-        qRegisterMetaType<QHostAddress>();
-    }
 }
 
 int OnionApi::port() const
@@ -53,6 +45,131 @@ QString OnionApi::socketError() const
     return server_.errorString();
 }
 
+void OnionApi::sendTunnelReady(QTcpSocket *requester, quint32 tunnelId, QByteArray hostkey)
+{
+    if(!buffers_.contains(requester) || !requester->isOpen()) {
+        qDebug() << "sendTunnelReady, but source requester is no longer connected, emitting destroyTunnel";
+        emit requestDestroyTunnel(tunnelId);
+        return;
+    }
+
+    //                    HDR  tunnelId
+    quint16 messageLength = 4 + 4 + hostkey.length();
+    QByteArray message;
+    QDataStream stream(&message, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    stream << messageLength;
+    stream << (quint16)MessageType::ONION_TUNNEL_READY;
+    stream << tunnelId;
+    stream.writeBytes(hostkey.data(), hostkey.size());
+
+    // sanity
+    Q_ASSERT(messageLength == message.length());
+
+    if(requester->write(message) == -1) {
+        qDebug() << "failed to send ONION_TUNNEL_READY (" << requester->errorString()
+                 << "), tearing down tunnel..";
+        emit requestDestroyTunnel(tunnelId);
+    } else {
+        // establish mapping tunnelId->socket
+        tunnelMapping_[tunnelId] = requester;
+    }
+}
+
+void OnionApi::sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey)
+{
+    // tunnel incoming will be sent to all api clients
+    if(nClients_ > 1) {
+        qDebug() << "ONION_TUNNEL_INCOMING, but multiple clients connected. Notifying each one, but they might destroy each others tunnels..";
+    }
+
+    //                    HDR  tunnelId
+    quint16 messageLength = 4 + 4 + hostkey.length();
+    QByteArray message;
+    QDataStream stream(&message, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    stream << messageLength;
+    stream << (quint16)MessageType::ONION_TUNNEL_INCOMING;
+    stream << tunnelId;
+    stream.writeBytes(hostkey.data(), hostkey.size());
+
+    // sanity
+    Q_ASSERT(messageLength == message.length());
+
+    for(QTcpSocket *socket : buffers_.keys()) {
+        if(socket->isOpen()) {
+            if(socket->write(message) == -1) {
+                qDebug() << "Failed to send ONION_TUNNEL_INCOMING to a client (total" << nClients_
+                         << ") ->" << socket->errorString();
+            }
+        }
+    }
+}
+
+void OnionApi::sendTunnelData(quint32 tunnelId, QByteArray data)
+{
+    if(!tunnelMapping_.contains(tunnelId)) {
+        qDebug() << "No mapping entry for tunnelId" << tunnelId << "not destroying dangling tunnel..";
+        return;
+    }
+
+    QTcpSocket *peer = tunnelMapping_[tunnelId];
+
+    //                    HDR  tunnelId
+    quint16 messageLength = 4 + 4 + data.length();
+    QByteArray message;
+    QDataStream stream(&message, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    stream << messageLength;
+    stream << (quint16)MessageType::ONION_TUNNEL_DATA;
+    stream << tunnelId;
+    stream.writeBytes(data.data(), data.size());
+
+    // sanity
+    Q_ASSERT(messageLength == message.length());
+
+    if(peer->write(message) == -1) {
+        qDebug() << "failed to write" << data.size() << "bytes to tunnel" << tunnelId
+                 << "->" << peer->errorString();
+    }
+}
+
+void OnionApi::sendTunnelError(quint32 tunnelId, MessageType requestType)
+{
+    if(!tunnelMapping_.contains(tunnelId)) {
+        qDebug() << "No mapping entry for tunnelId" << tunnelId;
+        return;
+    }
+
+    QTcpSocket *peer = tunnelMapping_[tunnelId];
+
+    //                     HDR request reserved tunnelId
+    quint16 messageLength = 4 +    2   +    2  +  4;
+    QByteArray message;
+    QDataStream stream(&message, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    stream << messageLength;
+    stream << (quint16)MessageType::ONION_ERROR;
+    stream << (quint16)requestType;
+    stream << (quint16)0;
+    stream << tunnelId;
+
+    // sanity
+    Q_ASSERT(messageLength == message.length());
+
+    if(peer->write(message) == -1) {
+        qDebug() << "Cannot send ONION_ERROR for tunnel" << tunnelId
+                 << "cleaning up tunnel anyway.. ->" << peer->errorString();
+    }
+
+    // tunnel is torn on error -> do local cleanup
+    onTunnelDestroyed(tunnelId);
+}
+
 void OnionApi::onConnection()
 {
     while (server_.hasPendingConnections()) {
@@ -76,6 +193,14 @@ void OnionApi::onConnection()
         });
         connect(socket, &QTcpSocket::destroyed, this, [=]() {
             buffers_.remove(socket); // clean up buffer
+            // clean up tunnel mapping
+            for(auto it = tunnelMapping_.begin(); it != tunnelMapping_.end();) {
+                if(it.value() == socket) {
+                    it = tunnelMapping_.erase(it);
+                } else {
+                    it++;
+                }
+            }
             nClients_--;
             qDebug() << nClients_ << "api clients remain";
         });
@@ -165,8 +290,7 @@ void OnionApi::readTunnelBuild(QByteArray message, QTcpSocket *client)
         return;
     }
 
-    emit requestBuildTunnel(ip, port, hostkey);
-    Q_UNUSED(client);
+    emit requestBuildTunnel(ip, port, hostkey, client);
 }
 
 void OnionApi::readTunnelDestroy(QByteArray message, QTcpSocket *client)
@@ -214,6 +338,11 @@ void OnionApi::readTunnelCover(QByteArray message, QTcpSocket *client)
 
     emit requestBuildCoverTunnel(randomDataSize);
     Q_UNUSED(client);
+}
+
+void OnionApi::onTunnelDestroyed(quint32 tunnelId)
+{
+    tunnelMapping_.remove(tunnelId);
 }
 
 

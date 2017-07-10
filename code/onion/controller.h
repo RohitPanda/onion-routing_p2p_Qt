@@ -2,6 +2,7 @@
 #define CONTROLLER_H
 
 #include <QObject>
+#include <QTcpSocket>
 #include "onionapi.h"
 #include "peertopeer.h"
 #include "settings.h"
