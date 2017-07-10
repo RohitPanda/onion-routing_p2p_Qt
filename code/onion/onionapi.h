@@ -65,6 +65,8 @@ private:
 
     QHostAddress interface_;
     int port_;
+
+    friend class OnionApiTester;
 };
 
 Q_DECLARE_METATYPE(QHostAddress);

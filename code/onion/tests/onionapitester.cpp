@@ -1,14 +1,26 @@
 #include "onionapitester.h"
 
-#include "onionapi.h"
-#include <QSignalSpy>
-#include <QTcpSocket>
-#include <QTest>
-#include <QTimer>
-
 OnionApiTester::OnionApiTester(QObject *parent) : QObject(parent)
 {
 
+}
+
+void OnionApiTester::setupPassiveApi(OnionApi *api, QTcpSocket *socket, QHostAddress addr, quint16 port)
+{
+    api->setInterface(addr);
+    api->setPort(port);
+
+    api->start();
+
+    socket->connectToHost(addr, port);
+    QTest::qWait(2000);
+
+    int i = 0;
+    while(i < 30 && socket->state() != QAbstractSocket::ConnectedState) {
+        QTest::qWait(100);
+    }
+
+    QCOMPARE(socket->state(), QAbstractSocket::ConnectedState);
 }
 
 void OnionApiTester::testBuildTunnel()
@@ -33,7 +45,7 @@ void OnionApiTester::testBuildTunnel()
 
     QCOMPARE(spy.count(), 1);
     QVariantList params = spy.takeFirst();
-    QCOMPARE(params.size(), 3);
+    QCOMPARE(params.size(), 4);
     QCOMPARE(params[0].value<QHostAddress>(), QHostAddress(QHostAddress::LocalHostIPv6));
     QCOMPARE(params[1].toInt(), 17093);
     QCOMPARE(params[2].toByteArray(), QByteArray("this is a test hostkey\0", 23));
@@ -124,5 +136,44 @@ void OnionApiTester::testBuildCoverTunnel()
     QCOMPARE(params[0].toInt(), 17093);
 
     s.close();
+}
+
+void OnionApiTester::testSendTunnelReady()
+{
+    OnionApi api;
+    QTcpSocket socket;
+
+    setupPassiveApi(&api, &socket, QHostAddress::LocalHost, 5027);
+    QSignalSpy spy(&socket, &QTcpSocket::readyRead);
+
+    // call
+    QCOMPARE(api.buffers_.size(), 1);
+    QTcpSocket *incomingSocket = api.buffers_.keys().first();
+    api.sendTunnelReady(incomingSocket, 17, QByteArray("imahostkey"));
+
+    spy.wait();
+    QCOMPARE(spy.count(), 1);
+
+    // read data
+    QByteArray result = socket.readAll();
+    QByteArray expected = QByteArray::fromHex("0012023100000011696d61686f73746b6579");
+    QCOMPARE(result, expected);
+
+    socket.close();
+}
+
+void OnionApiTester::testSendTunnelIncoming()
+{
+
+}
+
+void OnionApiTester::testSendTunnelData()
+{
+
+}
+
+void OnionApiTester::testSendTunnelError()
+{
+
 }
 

@@ -62,7 +62,7 @@ void OnionApi::sendTunnelReady(QTcpSocket *requester, quint32 tunnelId, QByteArr
     stream << messageLength;
     stream << (quint16)MessageType::ONION_TUNNEL_READY;
     stream << tunnelId;
-    stream.writeBytes(hostkey.data(), hostkey.size());
+    message.append(hostkey);
 
     // sanity
     Q_ASSERT(messageLength == message.length());
@@ -93,7 +93,7 @@ void OnionApi::sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey)
     stream << messageLength;
     stream << (quint16)MessageType::ONION_TUNNEL_INCOMING;
     stream << tunnelId;
-    stream.writeBytes(hostkey.data(), hostkey.size());
+    message.append(hostkey);
 
     // sanity
     Q_ASSERT(messageLength == message.length());
@@ -126,7 +126,7 @@ void OnionApi::sendTunnelData(quint32 tunnelId, QByteArray data)
     stream << messageLength;
     stream << (quint16)MessageType::ONION_TUNNEL_DATA;
     stream << tunnelId;
-    stream.writeBytes(data.data(), data.size());
+    message.append(data);
 
     // sanity
     Q_ASSERT(messageLength == message.length());
@@ -174,6 +174,7 @@ void OnionApi::onConnection()
 {
     while (server_.hasPendingConnections()) {
         QTcpSocket *socket = server_.nextPendingConnection();
+        buffers_[socket] = QByteArray(); // we use buffers_ for maintaining connected clients -> insert here early
         nClients_++;
         qDebug() << "client connected from" << socket->peerAddress() << ":" << socket->peerPort()
                  << "|" << nClients_ << "clients connected.";
