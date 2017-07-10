@@ -164,16 +164,86 @@ void OnionApiTester::testSendTunnelReady()
 
 void OnionApiTester::testSendTunnelIncoming()
 {
+    OnionApi api;
+    QTcpSocket socket;
 
+    setupPassiveApi(&api, &socket, QHostAddress::LocalHost, 5028);
+    QSignalSpy spy(&socket, &QTcpSocket::readyRead);
+
+    // call
+    QCOMPARE(api.buffers_.size(), 1);
+    api.sendTunnelIncoming(45678910, QByteArray("imanotherhostkey"));
+
+    spy.wait();
+    QCOMPARE(spy.count(), 1);
+
+    // read data
+    QByteArray result = socket.readAll();
+    QByteArray expected = QByteArray::fromHex("0018023202b9013e696d616e6f74686572686f73746b6579");
+    QCOMPARE(result, expected);
+
+    socket.close();
 }
 
 void OnionApiTester::testSendTunnelData()
 {
+    OnionApi api;
+    QTcpSocket socket;
+    quint32 tunnelId = 2357910;
 
+    setupPassiveApi(&api, &socket, QHostAddress::LocalHost, 5028);
+    QSignalSpy spy(&socket, &QTcpSocket::readyRead);
+
+    // setup tunnel to establish binding for us
+    QCOMPARE(api.buffers_.size(), 1);
+    QTcpSocket *incomingSocket = api.buffers_.keys().first();
+    api.sendTunnelReady(incomingSocket, tunnelId, QByteArray("imahostkey"));
+
+    spy.wait();
+    QCOMPARE(spy.count(), 1);
+
+    // read tunnel ready and discard it
+    socket.readAll();
+
+    api.sendTunnelData(tunnelId, QByteArray("fancyvoipinhere"));
+    spy.wait();
+
+    QCOMPARE(spy.count(), 2);
+    QByteArray result = socket.readAll();
+    QByteArray expected = QByteArray::fromHex("001702340023fa9666616e6379766f6970696e68657265");
+    QCOMPARE(result, expected);
+
+    socket.close();
 }
 
 void OnionApiTester::testSendTunnelError()
 {
+    OnionApi api;
+    QTcpSocket socket;
+    quint32 tunnelId = 46793122;
 
+    setupPassiveApi(&api, &socket, QHostAddress::LocalHost, 5028);
+    QSignalSpy spy(&socket, &QTcpSocket::readyRead);
+
+    // setup tunnel to establish binding for us
+    QCOMPARE(api.buffers_.size(), 1);
+    QTcpSocket *incomingSocket = api.buffers_.keys().first();
+    api.sendTunnelReady(incomingSocket, tunnelId, QByteArray("imahostkey"));
+
+    spy.wait();
+    QCOMPARE(spy.count(), 1);
+
+    // read tunnel ready and discard it
+    socket.readAll();
+
+    api.sendTunnelError(tunnelId, MessageType::ONION_TUNNEL_DATA);
+    spy.wait();
+
+    QCOMPARE(spy.count(), 2);
+    QByteArray result = socket.readAll();
+    QByteArray expected = QByteArray::fromHex("000c02350234000002ca01a2");
+    QCOMPARE(result, expected);
+
+    socket.close();
 }
 
