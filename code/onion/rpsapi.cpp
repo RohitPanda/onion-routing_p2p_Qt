@@ -102,7 +102,7 @@ void RPSApi::onData()
     QHostAddress peerAddress;
     QByteArray hostkey;
 
-    bool ipV4 = (ipV & 0x0001) == 0x0001;
+    bool ipV4 = (ipV & 0x0001) == 0x0000;
     if(ipV4) {
         quint32 ip;
         stream >> ip;

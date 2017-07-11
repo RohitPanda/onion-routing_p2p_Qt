@@ -37,7 +37,8 @@ HEADERS += \
     binding.h \
     onionapi.h \
     messagetypes.h \
-    rpsapi.h
+    rpsapi.h \
+    metatypes.h
 
 test{
 #    message(Configuring test build...)
@@ -49,10 +50,12 @@ test{
 
     SOURCES += \
         tests/onionapitester.cpp \
+        tests/rpsapitester.cpp \
         test.cpp
 
     HEADERS += \
-        tests/onionapitester.h
+        tests/onionapitester.h \
+        tests/rpsapitester.h
 } else {
     SOURCES += main.cpp
 }

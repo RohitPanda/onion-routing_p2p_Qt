@@ -3,6 +3,7 @@
 
 #include "binding.h"
 #include "messagetypes.h"
+#include "metatypes.h"
 
 #include <QObject>
 #include <QTcpServer>
@@ -68,7 +69,5 @@ private:
 
     friend class OnionApiTester;
 };
-
-Q_DECLARE_METATYPE(QHostAddress);
 
 #endif // API_H

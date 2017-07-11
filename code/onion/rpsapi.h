@@ -6,6 +6,7 @@
 #include <QTcpSocket>
 #include "binding.h"
 #include "messagetypes.h"
+#include "metatypes.h"
 
 class RPSApi : public QObject
 {
