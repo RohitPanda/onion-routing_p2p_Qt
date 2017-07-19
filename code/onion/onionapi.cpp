@@ -266,20 +266,32 @@ void OnionApi::onData(QTcpSocket *socket)
 void OnionApi::readTunnelBuild(QByteArray message, QTcpSocket *client)
 {
     // header 4B
-    // reserved 2B, port 2B
-    // ip addr 16B
+    // reserved 2B -> 1bit v4 flag, port 2B
+    // ip addr 16B/4B
     // hostkey VARCHAR
     QDataStream stream(message);
     stream.setByteOrder(QDataStream::BigEndian);
     stream.skipRawData(6);
 
-    quint16 port;
+    quint16 port, ipV;
     stream >> port;
+    stream >> ipV;
 
-    QByteArray ipArr = message.mid(8, 16);
-    // constructor takes 16 bytes of ipv6 addr in network byte order -> ok
-    QHostAddress ip(reinterpret_cast<quint8*>(ipArr.data()));
-    QByteArray hostkey = message.mid(24);
+    QByteArray hostkey;
+    QHostAddress ip;
+
+    bool ipV4 = (ipV & 0x0001) == 0x0000;
+    if(ipV4) {
+        quint32 ipaddr;
+        stream >> ipaddr;
+        ip.setAddress(ipaddr);
+        hostkey = message.mid(12);
+    } else {
+        QByteArray ipArr = message.mid(8, 16);
+        // constructor takes 16 bytes of ipv6 addr in network byte order -> ok
+        ip = QHostAddress(reinterpret_cast<quint8*>(ipArr.data()));
+        hostkey = message.mid(24);
+    }
 
     if(port == 0) {
         qDebug() << "cannot build tunnel to port 0";
@@ -287,7 +299,7 @@ void OnionApi::readTunnelBuild(QByteArray message, QTcpSocket *client)
     }
 
     if(ip.isNull()) {
-        qDebug() << "got invalid ip from ONION TUNNEL BUILD. Discarding message. IP hex:" << ipArr.toHex();
+        qDebug() << "got invalid ip from ONION TUNNEL BUILD. Discarding message";
         return;
     }
 

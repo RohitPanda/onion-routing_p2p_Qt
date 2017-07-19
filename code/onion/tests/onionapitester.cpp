@@ -35,7 +35,7 @@ void OnionApiTester::testBuildTunnel()
     api.start();
 
 
-    QByteArray testMessage = QByteArray::fromHex("002f0230000042C500000000000000000000000000000001746869732069732061207465737420686f73746b657900");
+    QByteArray testMessage = QByteArray::fromHex("002f0230000142C500000000000000000000000000000001746869732069732061207465737420686f73746b657900");
     QTcpSocket s;
     s.connectToHost(addr, port);
     QVERIFY(s.isOpen());
