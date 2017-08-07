@@ -271,11 +271,11 @@ void OnionApi::readTunnelBuild(QByteArray message, QTcpSocket *client)
     // hostkey VARCHAR
     QDataStream stream(message);
     stream.setByteOrder(QDataStream::BigEndian);
-    stream.skipRawData(6);
+    stream.skipRawData(4);
 
     quint16 port, ipV;
-    stream >> port;
     stream >> ipV;
+    stream >> port;
 
     QByteArray hostkey;
     QHostAddress ip;
