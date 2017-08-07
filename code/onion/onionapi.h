@@ -37,7 +37,8 @@ signals:
 public slots:
     // emits requestDestroyTunnel if requester disconnected during tunnel setup
     void sendTunnelReady(QTcpSocket *requester, quint32 tunnelId, QByteArray hostkey);
-    void sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey);
+    //void sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey);
+    void sendTunnelIncoming(quint32 tunnelId);
     void sendTunnelData(quint32 tunnelId, QByteArray data);
     void sendTunnelError(quint32 tunnelId, MessageType requestType);
 

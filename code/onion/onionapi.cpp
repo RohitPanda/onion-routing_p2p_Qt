@@ -77,7 +77,7 @@ void OnionApi::sendTunnelReady(QTcpSocket *requester, quint32 tunnelId, QByteArr
     }
 }
 
-void OnionApi::sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey)
+void OnionApi::sendTunnelIncoming(quint32 tunnelId)
 {
     // tunnel incoming will be sent to all api clients
     if(nClients_ > 1) {
@@ -85,7 +85,9 @@ void OnionApi::sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey)
     }
 
     //                    HDR  tunnelId
-    quint16 messageLength = 4 + 4 + hostkey.length();
+    //quint16 messageLength = 4 + 4 + hostkey.length();
+    //hostkey is not sent in TUNNEL INCOMING MESSAGE
+    quint16 messageLength = 4 + 4;
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
@@ -93,7 +95,7 @@ void OnionApi::sendTunnelIncoming(quint32 tunnelId, QByteArray hostkey)
     stream << messageLength;
     stream << (quint16)MessageType::ONION_TUNNEL_INCOMING;
     stream << tunnelId;
-    message.append(hostkey);
+    //message.append(hostkey);
 
     // sanity
     Q_ASSERT(messageLength == message.length());
