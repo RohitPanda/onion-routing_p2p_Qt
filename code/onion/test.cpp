@@ -1,5 +1,6 @@
 #include "tests/onionapitester.h"
 #include "tests/rpsapitester.h"
+#include "tests/peertopeermessagetester.h"
 #include <QTest>
 #include <QCoreApplication>
 
@@ -12,12 +13,14 @@ int main(int argc, char *argv[])
 
     auto tests = QList<QObject*>({
          new OnionApiTester(),
-         new RPSApiTester()
+         new RPSApiTester(),
+         new PeerToPeerMessageTester()
     });
 
-    bool ok;
+    bool ok = true;
     for(auto object : tests) {
-        ok &= QTest::qExec(object, argc, argv);
+        int no_failed = QTest::qExec(object, argc, argv);
+        ok &= no_failed == 0;
     }
     return ok ? 0 : -1;
 }

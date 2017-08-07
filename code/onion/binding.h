@@ -8,6 +8,7 @@ struct Binding {
     quint16 port = 0;
 
     QString toString() const { return QString("%1:%2").arg(address.toString(), QString::number(port)); }
+    bool isValid() const { return !address.isNull() && port != 0; }
 };
 
 

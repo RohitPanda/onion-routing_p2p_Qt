@@ -47,3 +47,33 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
     qDebug() << "P2P data from" << datagram.senderAddress() << ":" << datagram.senderPort();
     // TODO handle data, figure out if incoming connection or existing communication
 }
+
+int PeerToPeer::nHops() const
+{
+    return nHops_;
+}
+
+void PeerToPeer::setNHops(int nHops)
+{
+    nHops_ = nHops;
+}
+
+void PeerToPeer::buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QTcpSocket *requestId)
+{
+
+}
+
+void PeerToPeer::destroyTunnel(quint32 tunnelId)
+{
+
+}
+
+bool PeerToPeer::sendData(quint32 tunnelId, QByteArray data)
+{
+
+}
+
+void PeerToPeer::coverTunnel(quint16 size)
+{
+
+}
