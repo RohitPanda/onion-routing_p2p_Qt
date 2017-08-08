@@ -8,6 +8,7 @@
 
 #include "binding.h"
 #include "messagetypes.h"
+#include "peertopeermessage.h"
 
 // represents the UDP best effort connection to other onion modules.
 class PeerToPeer : public QObject
@@ -39,11 +40,7 @@ signals:
     void tunnelData(quint32 tunnelId, QByteArray data);
     void tunnelError(quint32 tunnelId, MessageType lastMessage);
 
-private slots:
-    void onDatagram();
-    void handleDatagram(QNetworkDatagram datagram);
-
-private:
+private:    // structs
     enum HopStatus {
         Unconnected,
         BuildSent,
@@ -58,23 +55,39 @@ private:
         HopStatus status = Unconnected;
         // TODO
     };
-    
+
     // state of a circuit (src==us, a, b, ..., dest)
     struct CircuitState {
         QVector<HopState> hopStates;
-        
+
         QByteArray buffer;
     };
-    
+
     struct TunnelState {
         Binding peer;
         Binding nextHop;
-        
+
+        quint32 tunnelIdPeer = 0;
+        quint32 tunnelIdNextHop = 0;
+
         bool hasNextHop() const { return nextHop.isValid(); }
     };
 
+private slots:
+    void onDatagram();
+    void handleDatagram(QNetworkDatagram datagram);
+
+    void handleCircuitMessage(PeerToPeerMessage message, CircuitState *circuit);
+    void handleTunnelMessage(PeerToPeerMessage message, TunnelState *tunnel);
+    void handleUnknownMessage(PeerToPeerMessage message);
+
+private:
+
+    // we're source here, tunnelId is src<->a
     QHash<quint32, CircuitState> circuits_;
-    QHash<quint32, TunnelState> tunnels_;
+    // we're in the path, thus two valid tunnelIds: a <-> us <-> b
+    // saved inside TunnelState
+    QList<TunnelState> tunnels_;
     quint32 nextTunnelId_ = 1;
 
     QUdpSocket socket_;
