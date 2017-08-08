@@ -172,14 +172,14 @@ void OnionApiTester::testSendTunnelIncoming()
 
     // call
     QCOMPARE(api.buffers_.size(), 1);
-    api.sendTunnelIncoming(45678910, QByteArray("imanotherhostkey"));
+    api.sendTunnelIncoming(45678910);
 
     spy.wait();
     QCOMPARE(spy.count(), 1);
 
     // read data
     QByteArray result = socket.readAll();
-    QByteArray expected = QByteArray::fromHex("0018023202b9013e696d616e6f74686572686f73746b6579");
+    QByteArray expected = QByteArray::fromHex("0008023202b9013e");
     QCOMPARE(result, expected);
 
     socket.close();
