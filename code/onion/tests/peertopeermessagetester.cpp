@@ -76,8 +76,8 @@ void PeerToPeerMessageTester::testRelayData()
     message.celltype = PeerToPeerMessage::RELAY;
     message.rcmd = PeerToPeerMessage::RELAY_DATA;
     message.streamId = 17;
-    message.digest = 0;
     message.data = "HALLO123";
+    message.calculateDigest();
 
     verifyWritePayload(message, QByteArray::fromHex("000016f70101001100000000000848414c4c4f313233"));
 
@@ -88,7 +88,7 @@ void PeerToPeerMessageTester::testRelayData()
     QCOMPARE(out.celltype, PeerToPeerMessage::RELAY);
     QCOMPARE(out.rcmd, PeerToPeerMessage::RELAY_DATA);
     QCOMPARE(out.streamId, (quint16)17);
-    QCOMPARE(out.digest, (quint32)0);
+    QVERIFY(out.isValidDigest());
     QCOMPARE(out.data, QByteArray("HALLO456"));
 }
 
@@ -99,10 +99,10 @@ void PeerToPeerMessageTester::testRelayExtend4()
     message.celltype = PeerToPeerMessage::RELAY;
     message.rcmd = PeerToPeerMessage::RELAY_EXTEND;
     message.streamId = 17;
-    message.digest = 0;
     message.port = 8080;
     message.address.setAddress(QHostAddress::LocalHost);
     message.data = "HOSTKEY_";
+    message.calculateDigest();
 
     verifyWritePayload(message, QByteArray::fromHex("000016f70102001100000000047f0000011f900008484f53544b45595f"));
 
@@ -113,7 +113,7 @@ void PeerToPeerMessageTester::testRelayExtend4()
     QCOMPARE(out.celltype, PeerToPeerMessage::RELAY);
     QCOMPARE(out.rcmd, PeerToPeerMessage::RELAY_EXTEND);
     QCOMPARE(out.streamId, (quint16)17);
-    QCOMPARE(out.digest, (quint32)0);
+    QVERIFY(out.isValidDigest());
     QCOMPARE(out.data, QByteArray("HOSTKEY_"));
     QCOMPARE(out.address.protocol(), QAbstractSocket::IPv4Protocol);
     QCOMPARE(out.address, QHostAddress(QHostAddress::LocalHost));
@@ -127,10 +127,10 @@ void PeerToPeerMessageTester::testRelayExtend6()
     message.celltype = PeerToPeerMessage::RELAY;
     message.rcmd = PeerToPeerMessage::RELAY_EXTEND;
     message.streamId = 17;
-    message.digest = 0;
     message.port = 8080;
     message.address.setAddress(QHostAddress::LocalHostIPv6);
     message.data = "HOSTKEY_";
+    message.calculateDigest();
 
     verifyWritePayload(message, QByteArray::fromHex("000016f7010200110000000006000000000000000000000000000000011f900008484f53544b45595f"));
 
@@ -141,7 +141,7 @@ void PeerToPeerMessageTester::testRelayExtend6()
     QCOMPARE(out.celltype, PeerToPeerMessage::RELAY);
     QCOMPARE(out.rcmd, PeerToPeerMessage::RELAY_EXTEND);
     QCOMPARE(out.streamId, (quint16)17);
-    QCOMPARE(out.digest, (quint32)0);
+    QVERIFY(out.isValidDigest());
     QCOMPARE(out.data, QByteArray("HOSTKEY_"));
     QCOMPARE(out.address.protocol(), QAbstractSocket::IPv6Protocol);
     QCOMPARE(out.address, QHostAddress(QHostAddress::LocalHostIPv6));
@@ -155,8 +155,8 @@ void PeerToPeerMessageTester::testRelayExtended()
     message.celltype = PeerToPeerMessage::RELAY;
     message.rcmd = PeerToPeerMessage::RELAY_EXTENDED;
     message.streamId = 17;
-    message.digest = 0;
     message.data = "HALLO123";
+    message.calculateDigest();
 
     verifyWritePayload(message, QByteArray::fromHex("000016f70103001100000000000848414c4c4f313233"));
 
@@ -167,7 +167,7 @@ void PeerToPeerMessageTester::testRelayExtended()
     QCOMPARE(out.celltype, PeerToPeerMessage::RELAY);
     QCOMPARE(out.rcmd, PeerToPeerMessage::RELAY_EXTENDED);
     QCOMPARE(out.streamId, (quint16)17);
-    QCOMPARE(out.digest, (quint32)0);
+    QVERIFY(out.isValidDigest());
     QCOMPARE(out.data, QByteArray("HALLO456"));
 }
 
@@ -178,7 +178,7 @@ void PeerToPeerMessageTester::testRelayTruncated()
     message.celltype = PeerToPeerMessage::RELAY;
     message.rcmd = PeerToPeerMessage::RELAY_TRUNCATED;
     message.streamId = 17;
-    message.digest = 0;
+    message.calculateDigest();
 
     verifyWritePayload(message, QByteArray::fromHex("000016f70104001100000000"));
 
@@ -189,7 +189,7 @@ void PeerToPeerMessageTester::testRelayTruncated()
     QCOMPARE(out.celltype, PeerToPeerMessage::RELAY);
     QCOMPARE(out.rcmd, PeerToPeerMessage::RELAY_TRUNCATED);
     QCOMPARE(out.streamId, (quint16)17);
-    QCOMPARE(out.digest, (quint32)0);
+    QVERIFY(out.isValidDigest());
 }
 
 void PeerToPeerMessageTester::verifyWritePayload(PeerToPeerMessage message, QByteArray expectedPayload)
