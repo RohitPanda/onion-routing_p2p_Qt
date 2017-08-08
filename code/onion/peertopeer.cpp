@@ -52,12 +52,10 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
 
     qDebug() << "P2P data from" << datagram.senderAddress() << ":" << datagram.senderPort();
 
-    // TODO decrypt here first!
-
-    // Parse a P2PMessage
+    // peek a P2PMessage
     QDataStream stream(data);
     PeerToPeerMessage message;
-    stream >> message;
+    peekMessage(stream, message);
 
     if(message.malformed) {
         qDebug() << "P2P malformed message from" << datagram.senderAddress() << ":"
