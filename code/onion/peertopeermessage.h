@@ -50,7 +50,8 @@ public:
         RELAY_EXTENDED = 0x03,
         RELAY_TRUNCATED = 0x04,
         CMD_DESTROY = 0x05,
-        CMD_TRUNCATED = 0x06
+        CMD_TRUNCATED = 0x06,
+        CMD_COVER = 0x07
     };
 
     bool isEncrypted() const { return celltype == ENCRYPTED; }

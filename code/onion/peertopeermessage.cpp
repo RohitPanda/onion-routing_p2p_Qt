@@ -83,6 +83,7 @@ QDataStream &operator<<(QDataStream &stream, const PeerToPeerMessage &message)
         bytesWritten += 6;
         break;
     case PeerToPeerMessage::CMD_DESTROY:
+    case PeerToPeerMessage::CMD_COVER: // padding also fills data up, so no extra random data.
         // no more data
         break;
     case PeerToPeerMessage::CMD_TRUNCATED:
@@ -227,6 +228,7 @@ bool parseMessage(QDataStream &stream, PeerToPeerMessage &message)
         // TODO
         break;
     case PeerToPeerMessage::CMD_DESTROY:
+    case PeerToPeerMessage::CMD_COVER:
         // no more data
         break;
     case PeerToPeerMessage::CMD_TRUNCATED:
@@ -239,6 +241,7 @@ bool parseMessage(QDataStream &stream, PeerToPeerMessage &message)
         break;
     }
 
+    stream.skipRawData(MESSAGE_LENGTH - bytesRead);
     return !message.malformed;
 }
 
