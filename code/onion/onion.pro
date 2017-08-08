@@ -18,8 +18,7 @@ SOURCES += \
     settings.cpp \
     onionapi.cpp \
     rpsapi.cpp \
-    peertopeermessage.cpp \
-    tests/peertopeermessagetester.cpp
+    peertopeermessage.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -41,8 +40,7 @@ HEADERS += \
     messagetypes.h \
     rpsapi.h \
     metatypes.h \
-    peertopeermessage.h \
-    tests/peertopeermessagetester.h
+    peertopeermessage.h
 
 test{
 #    message(Configuring test build...)
@@ -55,11 +53,13 @@ test{
     SOURCES += \
         tests/onionapitester.cpp \
         tests/rpsapitester.cpp \
+        tests/peertopeermessagetester.cpp \
         test.cpp
 
     HEADERS += \
         tests/onionapitester.h \
-        tests/rpsapitester.h
+        tests/rpsapitester.h \
+        tests/peertopeermessagetester.h
 } else {
     SOURCES += main.cpp
 }
