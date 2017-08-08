@@ -159,9 +159,9 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
             int payloadSize = readPayload(stream, &message.data);
             if(payloadSize == -1) {
                 qDebug() << "unreasonable payload size" << payloadSize;
-                // TODO close connection
                 // reset payloadsize for consumeOver
                 payloadSize = 0;
+                message.malformed = true;
             }
 
             consumeOver = MESSAGE_LENGTH - 12 - 2 - payloadSize;
@@ -181,6 +181,7 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
                 consumeOver = MESSAGE_LENGTH - 12 - 1 - 16 - 2;
             } else {
                 qDebug() << "IPV invalid in RELAY_EXTEND message" << ipv;
+                message.malformed = true;
                 consumeOver = MESSAGE_LENGTH - 12 - 1 - 2;
             }
             stream >> message.port;
@@ -188,7 +189,7 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
             int payloadSize = readPayload(stream, &message.data);
             if(payloadSize == -1) {
                 qDebug() << "unreasonable payload size" << payloadSize;
-                // TODO close connection
+                message.malformed = true;
                 // reset payloadsize for consumeOver
                 payloadSize = 0;
             }
@@ -197,7 +198,7 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
             int payloadSize = readPayload(stream, &message.data);
             if(payloadSize == -1) {
                 qDebug() << "unreasonable payload size" << payloadSize;
-                // TODO close connection
+                message.malformed = true;
                 // reset payloadsize for consumeOver
                 payloadSize = 0;
             }
@@ -207,13 +208,14 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
             consumeOver = MESSAGE_LENGTH - 12;
         } else {
             qDebug() << "unknown rcmd" << message.rcmd;
+            message.malformed = true;
             consumeOver = MESSAGE_LENGTH - 12;
         }
     } else if(message.celltype == PeerToPeerMessage::CMD_BUILD) {
         int payloadSize = readPayload(stream, &message.data);
         if(payloadSize == -1) {
             qDebug() << "unreasonable payload size" << payloadSize;
-            // TODO close connection
+            message.malformed = true;
             // reset payloadsize for consumeOver
             payloadSize = 0;
         }
@@ -222,7 +224,7 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
         int payloadSize = readPayload(stream, &message.data);
         if(payloadSize == -1) {
             qDebug() << "unreasonable payload size" << payloadSize;
-            // TODO close connection
+            message.malformed = true;
             // reset payloadsize for consumeOver
             payloadSize = 0;
         }
@@ -235,10 +237,12 @@ QDataStream &operator>>(QDataStream &stream, PeerToPeerMessage &message)
         consumeOver = MESSAGE_LENGTH - 5;
     } else {
         qDebug() << "unknown celltype" << message.celltype;
+        message.malformed = true;
     }
 
     if(consumeOver < 0) {
         qDebug() << "error or unset consumeOver, got" << consumeOver;
+        message.malformed = true;
     } else {
         stream.skipRawData(consumeOver);
     }

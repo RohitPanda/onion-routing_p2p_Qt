@@ -29,7 +29,7 @@
 //
 // control messages: DESTROY
 //    general message header (5B)
-//    ??
+//    ?? TODO needs authentication, since we're not using tls but plain udp
 //
 // control messages: COVER
 //    general message header (5B)
@@ -108,6 +108,8 @@ public:
 
     // relay_data, also handshake payload for build/created/extend/extended
     QByteArray data; // payload + payloadSize
+
+    bool malformed = false; // should close connection to this peer
 };
 
 // read a 16bit integer for length, and this amount of data after it into target.
