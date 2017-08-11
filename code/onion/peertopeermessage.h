@@ -1,17 +1,20 @@
 #ifndef PEERTOPEERMESSAGE_H
 #define PEERTOPEERMESSAGE_H
 
+#include "binding.h"
+
 #include <QDataStream>
 #include <QHostAddress>
+#include <QNetworkDatagram>
 
 // layout
 // fixed-size: 1027 B
 // with three byte unencrypted, encrypted payload will be multiple of 128, eliminating padding for encryption
 #define MESSAGE_LENGTH 1027
 // we allow a hop length of up to 7
-//    -> relay data header is 3B -> reserve 12 * 3 = 36B for headers
-//    -> maximum unfragmented payload size on client / exit node should be 1024B - 36B = 988B
-#define MAX_RELAY_DATA_SIZE 988
+//    -> relay data header is 7B -> reserve 12 * 7 = 84B for headers
+//    -> maximum unfragmented payload size on client / exit node should be 1024B - 84B = 940B
+#define MAX_RELAY_DATA_SIZE 940
 //
 // first byte indicates build (01) / created (02) / encrypted (03) message
 //
@@ -23,11 +26,11 @@
 // celltype can be CMD_DESTROY, RELAY_DATA, RELAY_EXTEND, RELAY_EXTENDED, RELAY_TRUNCATED
 //
 // command payload:
-// | 03 | CMD_DESTROY     | -
-// | 03 | RELAY_DATA      | streamId (2B) | digest (4B) | data_size (2B) | data
-// | 03 | RELAY_EXTEND    | streamId (2B) | digest (4B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
-// | 03 | RELAY_EXTENDED  | streamId (2B) | digest (4B) | handshake_len (2B) | handshake
-// | 03 | RELAY_TRUNCATED | streamId (2B) | digest (4B) | ??? (TODO)
+// | 03 | CMD_DESTROY     | digest (4B) | reserved (2B) // to fit header size
+// | 03 | RELAY_DATA      | digest (4B) | streamId (2B) | data_size (2B) | data
+// | 03 | RELAY_EXTEND    | digest (4B) | streamId (2B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
+// | 03 | RELAY_EXTENDED  | digest (4B) | streamId (2B) | handshake_len (2B) | handshake
+// | 03 | RELAY_TRUNCATED | digest (4B) | streamId (2B) | ??? (TODO)
 
 class PeerToPeerMessage
 {
@@ -77,22 +80,31 @@ public:
     QByteArray data; // payload + payloadSize
 
     bool malformed = false; // should close connection to this peer
+
+    Binding sender; // parsed from QNetworkDatagram if present
+
+    static PeerToPeerMessage fromDatagram(QNetworkDatagram dgram);
+    static PeerToPeerMessage fromBytes(QByteArray fullPacket);
+
+    // parse the payload of a 03 | circId | <encryptedMessage> msg
+    static PeerToPeerMessage fromEncryptedPayload(QByteArray encryptedMessage); // ignores the preface 03 | circId
+    static PeerToPeerMessage fromEncryptedPayload(QByteArray encryptedMessage, quint16 circId);
+
+    QByteArray toEncryptedPayload() const; // make a packet without header
+    QByteArray toBytes() const; // make a full packet
+    QNetworkDatagram toDatagram(Binding target = Binding()) const; // uses target or this.sender if sender is invalid
+
+private:
+    QByteArray pad(QByteArray packet, int length);
 };
 
 // read a 16bit integer for length, and this amount of data after it into target message.
 // if the size is bigger than maxSize, content is discarded. Returns number of bytes consumed from stream
-int readPayload(QDataStream& stream, PeerToPeerMessage *target, quint16 maxSize = MAX_RELAY_DATA_SIZE);
+bool readPayload(QDataStream& stream, QByteArray *target, quint16 maxSize = MAX_RELAY_DATA_SIZE);
 
 // write a source into stream, as a 16bit length integer with data following.
-// writes maxSize at maximum, truncating source. Returns number of bytes written from array (not including length)
-int writePayload(QDataStream& stream, QByteArray source, quint16 maxSize = MAX_RELAY_DATA_SIZE);
-
-QDataStream & operator<< (QDataStream& stream, const PeerToPeerMessage& message);
-
-// peeks at the message in stream, not reading an encrypted message's payload
-bool peekMessage(QDataStream& stream, PeerToPeerMessage& message);
-// parses the message in stream, assuming already unencrypted payload
-bool parseMessage(QDataStream& stream, PeerToPeerMessage& message);
+// writes maxSize at maximum, truncating source. Returns true if source was written completely
+bool writePayload(QDataStream& stream, QByteArray source, quint16 maxSize = MAX_RELAY_DATA_SIZE);
 
 
 #endif // PEERTOPEERMESSAGE_H

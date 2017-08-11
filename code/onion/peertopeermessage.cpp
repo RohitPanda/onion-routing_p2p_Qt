@@ -26,8 +26,6 @@ QString PeerToPeerMessage::typeString() const
             return "ENCRYPTED -> RELAY_TRUNCATED";
         case PeerToPeerMessage::CMD_DESTROY:
             return "ENCRYPTED -> CMD_DESTROY";
-        case PeerToPeerMessage::CMD_TRUNCATED:
-            return "ENCRYPTED -> CMD_TRUNCATED";
         case PeerToPeerMessage::CMD_COVER:
             return "ENCRYPTED -> CMD_COVER";
         default:
@@ -52,108 +50,256 @@ bool PeerToPeerMessage::isValidDigest() const
     return digest == 0;
 }
 
-QDataStream &operator<<(QDataStream &stream, const PeerToPeerMessage &message)
+PeerToPeerMessage PeerToPeerMessage::fromDatagram(QNetworkDatagram dgram)
 {
-    // first byte
-    stream << static_cast<quint8>(message.celltype);
-    if(message.celltype == PeerToPeerMessage::BUILD || message.celltype == PeerToPeerMessage::CREATED) {
-        // | 01/02 | handshake_len (2B) | handshake
-        int written = 1 + 2 + writePayload(stream, message.data);
+    PeerToPeerMessage msg = fromBytes(dgram.data());
+    msg.sender = Binding(dgram.senderAddress(), dgram.senderPort());
+    return msg;
+}
 
-        QByteArray padding(MESSAGE_LENGTH - written, '?');
-        stream.writeRawData(padding.data(), padding.size());
-        return stream;
+PeerToPeerMessage PeerToPeerMessage::fromBytes(QByteArray fullPacket)
+{
+    if(fullPacket.size() != MESSAGE_LENGTH) {
+        qDebug() << "invalid packet size in fromBytes, got" << fullPacket.size();
+        PeerToPeerMessage response;
+        response.malformed = true;
+        return response;
     }
 
-    // encrypted message:
-    // | 03 | tId | <command> |   [6B]
-    stream << message.tunnelId;
-    stream << static_cast<quint8>(message.command);
+    // parse messagetype byte
+    QDataStream stream(fullPacket);
+    stream.setByteOrder(QDataStream::BigEndian);
 
-    int bytesWritten = 6;
+    // first byte
+    quint8 ctypeChar;
+    quint16 circId;
+    stream >> ctypeChar >> circId;
+    PeerToPeerMessage::Celltype ctype = static_cast<PeerToPeerMessage::Celltype>(ctypeChar);
+
+    // for 01/02 parse full packet, otherwise forward to fromDecrypted
+    if(ctype == PeerToPeerMessage::BUILD || ctype == PeerToPeerMessage::CREATED) {
+        // | 01/02 | circId | handshake_len (2B) | handshake
+        QByteArray handshake;
+        bool ok = readPayload(stream, &handshake);
+        PeerToPeerMessage result;
+        result.celltype = ctype;
+        result.circuitId = circId;
+        result.data = handshake;
+        result.malformed = !ok;
+
+        return result;
+    }
+
+    if(ctype != PeerToPeerMessage::ENCRYPTED) {
+        qDebug() << "invalid celltype fromBytes, got" << ctype();
+        PeerToPeerMessage response;
+        response.malformed = true;
+        return response;
+    }
+
+    QByteArray payload = fullPacket.mid(3);
+    PeerToPeerMessage fromEncrypted = fromEncryptedPayload(payload, false); // should still be encrypted
+    // set what we parsed
+    fromEncrypted.circuitId = circId;
+    fromEncrypted.celltype = ctype;
+    return fromEncrypted;
+}
+
+PeerToPeerMessage PeerToPeerMessage::fromEncryptedPayload(QByteArray encryptedMessage)
+{
+    QDataStream stream(encryptedMessage);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    // parse relay header
+    PeerToPeerMessage message;
+    message.celltype = PeerToPeerMessage::ENCRYPTED;
+    quint8 commandChar;
+    stream << commandChar << message.digest << message.streamId;
+
+    if(!message.isValidDigest()) {
+        // message is still encrypted
+        message.command = PeerToPeerMessage::CMD_INVALID;
+        return message;
+    }
+
+    // parse fully, stream is now at start of command payload
+    message.command = static_cast<PeerToPeerMessage::Commandtype>(commandChar);
+
     switch (message.command) {
-        break;
     case PeerToPeerMessage::RELAY_DATA:
-        // | 03 | tId | RELAY_DATA      | streamId (2B) | digest (4B) | data_size (2B) | data
-        stream << message.streamId;
-        stream << message.digest;
-        bytesWritten += 6 + 2 + writePayload(stream, message.data);
+        // data_size (2B) | data
+        message.malformed = !readPayload(stream, &message.data);
         break;
     case PeerToPeerMessage::RELAY_EXTEND:
-        // | 03 | tId | RELAY_EXTEND    | streamId (2B) | digest (4B) | ip_v (1B) | ip (4B/16B) |
-        // | port (2B) | handshake_len (2B) | handshake
-        stream << message.streamId;
-        stream << message.digest;
+        // ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
     {
-        if(message.address.isNull()) {
-            qDebug() << "invalid hostaddress while building RELAY_EXTEND message";
-        }
-        bool ipv4 = message.address.protocol() == QAbstractSocket::IPv4Protocol;
-        stream << static_cast<quint8>(ipv4 ? 4 : 6);
-        bytesWritten += 7;
-        if(ipv4) {
-            stream << message.address.toIPv4Address();
-            bytesWritten += 4;
+        quint8 ipv;
+        stream >> ipv;
+        if(ipv == 4) {
+            quint32 ip;
+            stream >> ip;
+            message.address.setAddress(ip);
+        } else if(ipv == 6) {
+            QByteArray ipArr;
+            ipArr.resize(16);
+            stream.readRawData(ipArr.data(), 16);
+            message.address.setAddress(reinterpret_cast<quint8*>(ipArr.data()));
         } else {
-            Q_IPV6ADDR addr = message.address.toIPv6Address();
-            for(int i = 0; i < 16; i++) {
-                stream << addr[i];
-            }
-            bytesWritten += 16;
+            qDebug() << "IPV invalid in RELAY_EXTEND message" << ipv;
+            message.malformed = true;
         }
-        stream << message.port;
-        bytesWritten += 2 + 2 + writePayload(stream, message.data);
+        stream >> message.port;
+        bool ok = readPayload(stream, &message.data);
+        if(!ok) {
+            message.malformed = true;
+        }
     }
         break;
     case PeerToPeerMessage::RELAY_EXTENDED:
-        // | 03 | tId | RELAY_EXTENDED  | streamId (2B) | digest (4B) | handshake_len (2B) | handshake
-        stream << message.streamId;
-        stream << message.digest;
-        bytesWritten += 6 + 2 + writePayload(stream, message.data);
+        // handshake_len (2B) | handshake
+        message.malformed = !readPayload(stream, &message);
         break;
     case PeerToPeerMessage::RELAY_TRUNCATED:
-        // | 03 | tId | RELAY_TRUNCATED | streamId (2B) | digest (4B) | ??? (TODO)
-        stream << message.streamId;
-        stream << message.digest;
-        bytesWritten += 6;
-        break;
     case PeerToPeerMessage::CMD_DESTROY:
-    case PeerToPeerMessage::CMD_COVER: // padding also fills data up, so no extra random data.
-        // no more data
-        break;
-    case PeerToPeerMessage::CMD_TRUNCATED:
-        // TODO
+    case PeerToPeerMessage::CMD_COVER:
+        // <no payload>
         break;
     case PeerToPeerMessage::CMD_INVALID:
     default:
-        qDebug() << "invalid command" << message.command;
+        qDebug() << "Reading invalid message command from valid digest o.0" << message.command;
+        message.malformed = true;
         break;
     }
 
-    QByteArray padding(MESSAGE_LENGTH - bytesWritten, '?');
-    stream.writeRawData(padding.data(), padding.size());
-    return stream;
+    return message;
 }
 
-int readPayload(QDataStream &stream, PeerToPeerMessage *target, quint16 maxSize)
+PeerToPeerMessage PeerToPeerMessage::fromEncryptedPayload(QByteArray encryptedMessage, quint16 circId)
+{
+    PeerToPeerMessage message = fromEncryptedPayload(encryptedMessage);
+    message.circuitId = circId;
+    return message;
+}
+
+QByteArray PeerToPeerMessage::toEncryptedPayload() const
+{
+    QByteArray payload;
+    QDataStream stream(&payload, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    // write header
+    stream << static_cast<quint8>(command) << digest << streamId;
+
+    // write command payload
+    switch (command) {
+    case PeerToPeerMessage::RELAY_DATA:
+        // data_size (2B) | data
+        writePayload(stream, data);
+        break;
+    case PeerToPeerMessage::RELAY_EXTEND:
+        // ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
+    {
+        if(address.isNull()) {
+            qDebug() << "invalid hostaddress while building RELAY_EXTEND message";
+        }
+        bool ipv4 = address.protocol() == QAbstractSocket::IPv4Protocol;
+        stream << static_cast<quint8>(ipv4 ? 4 : 6);
+        if(ipv4) {
+            stream << address.toIPv4Address();
+        } else {
+            Q_IPV6ADDR addr = address.toIPv6Address();
+            for(int i = 0; i < 16; i++) {
+                stream << addr[i];
+            }
+        }
+        stream << port;
+        writePayload(stream, data);
+    }
+        break;
+    case PeerToPeerMessage::RELAY_EXTENDED:
+        // handshake_len (2B) | handshake
+        writePayload(stream, data);
+        break;
+    case PeerToPeerMessage::RELAY_TRUNCATED:
+    case PeerToPeerMessage::CMD_DESTROY:
+    case PeerToPeerMessage::CMD_COVER: // padding also fills data up, so no extra random data.
+        // no more data to write
+        break;
+    case PeerToPeerMessage::CMD_INVALID:
+    default:
+        qDebug() << "invalid command" << command;
+        break;
+    }
+
+    return pad(payload, MESSAGE_LENGTH - 3); // we're not a full packet
+}
+
+QByteArray PeerToPeerMessage::toBytes() const
+{
+    QByteArray packet;
+    QDataStream stream(&packet, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    if(celltype == BUILD || celltype == CREATED) {
+        // 01/02 | circId | handshake_len | handshake
+        stream << static_cast<quint8>(celltype);
+        stream << circuitId;
+        writePayload(stream, data);
+        return pad(packet, MESSAGE_LENGTH);
+    }
+
+    if(celltype == ENCRYPTED) {
+        stream << static_cast<quint8>(celltype);
+        stream << circuitId;
+        QByteArray payload = toEncryptedPayload();
+        stream.writeRawData(payload.data(), payload.size());
+        return packet;
+    }
+
+    qDebug() << "invalid celltype in toBytes" << celltype;
+    return QByteArray();
+}
+
+QNetworkDatagram PeerToPeerMessage::toDatagram(Binding target) const
+{
+    QByteArray data = toBytes();
+    if(!target.isValid()) {
+        target = sender;
+    }
+
+    if(!target.isValid()) {
+        qDebug() << "toDatagram -> invalid target and unset sender in P2PMessage. Datagram will fail to send.";
+    }
+
+    QNetworkDatagram dgram(data, target.address, target.port);
+    return dgram;
+}
+
+QByteArray PeerToPeerMessage::pad(QByteArray packet, int length)
+{
+    QByteArray padding('?', length - packet.size());
+    padding.prepend(packet);
+    return padding;
+}
+
+bool readPayload(QDataStream &stream, QByteArray *target, quint16 maxSize)
 {
     quint16 size;
     stream >> size;
 
     if(size > maxSize) {
         qDebug() << "unreasonable payload size to read" << size;
-        target->malformed = true;
-        return 2;
+        return false;
     }
 
     QByteArray data;
     data.resize(size);
     stream.readRawData(data.data(), size);
-    target->data = data;
-    return size + 2;
+    *target = data;
+    return true;
 }
 
-int writePayload(QDataStream &stream, QByteArray source, quint16 maxSize)
+bool writePayload(QDataStream &stream, QByteArray source, quint16 maxSize)
 {
     quint16 size = source.size();
     if(source.size() > maxSize) {
@@ -163,122 +309,6 @@ int writePayload(QDataStream &stream, QByteArray source, quint16 maxSize)
 
     stream << size;
     stream.writeRawData(source.data(), size);
-    return size;
-}
-
-bool peekMessage(QDataStream &stream, PeerToPeerMessage &message)
-{
-    // first byte
-    quint8 cellt;
-    stream >> cellt;
-    message.celltype = static_cast<PeerToPeerMessage::Celltype>(cellt);
-
-    if(message.celltype == PeerToPeerMessage::BUILD || message.celltype == PeerToPeerMessage::CREATED) {
-        // | 01/02 | handshake_len (2B) | handshake
-        int read = readPayload(stream, &message);
-
-        // read padding
-        stream.skipRawData(MESSAGE_LENGTH - 1 - read);
-        return true;
-    }
-
-    // encrypted message
-    // -> read encrypted fixed-size header to allow encryption status check,
-    //    but don't read full payload, cause it might still be encrypted
-    // TODO fixme design change
-    stream.skipRawData(MESSAGE_LENGTH - 1);
-    return true;
-}
-
-bool parseMessage(QDataStream &stream, PeerToPeerMessage &message)
-{
-    // first byte
-    quint8 cellt;
-    stream >> cellt;
-    message.celltype = static_cast<PeerToPeerMessage::Celltype>(cellt);
-
-    if(message.celltype == PeerToPeerMessage::BUILD || message.celltype == PeerToPeerMessage::CREATED) {
-        // | 01/02 | handshake_len (2B) | handshake
-        int read = readPayload(stream, &message);
-
-        // read padding
-        stream.skipRawData(MESSAGE_LENGTH - 1 - read);
-        return true;
-    }
-
-    // encrypted message:
-    // | 03 | tId | <command> |   [6B]
-    quint8 cmnd;
-    stream >> message.tunnelId >> cmnd;
-    message.command = static_cast<PeerToPeerMessage::Commandtype>(cmnd);
-
-    int bytesRead = 6;
-    switch (message.command) {
-        break;
-    case PeerToPeerMessage::RELAY_DATA:
-        // | 03 | tId | RELAY_DATA      | streamId (2B) | digest (4B) | data_size (2B) | data
-        stream >> message.streamId;
-        stream >> message.digest;
-        bytesRead += 6;
-        bytesRead += readPayload(stream, &message);
-        break;
-    case PeerToPeerMessage::RELAY_EXTEND:
-        // | 03 | tId | RELAY_EXTEND    | streamId (2B) | digest (4B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
-    {
-        quint8 ipv;
-        stream >> message.streamId;
-        stream >> message.digest;
-        stream >> ipv;
-        bytesRead += 7;
-        if(ipv == 4) {
-            quint32 ip;
-            stream >> ip;
-            message.address.setAddress(ip);
-            bytesRead += 4;
-        } else if(ipv == 6) {
-            QByteArray ipArr;
-            ipArr.resize(16);
-            stream.readRawData(ipArr.data(), 16);
-            message.address.setAddress(reinterpret_cast<quint8*>(ipArr.data()));
-            bytesRead += 16;
-        } else {
-            qDebug() << "IPV invalid in RELAY_EXTEND message" << ipv;
-            message.malformed = true;
-        }
-        stream >> message.port;
-        bytesRead += 2;
-        bytesRead += readPayload(stream, &message);
-    }
-        break;
-    case PeerToPeerMessage::RELAY_EXTENDED:
-        // | 03 | tId | RELAY_EXTENDED  | streamId (2B) | digest (4B) | handshake_len (2B) | handshake
-        stream >> message.streamId;
-        stream >> message.digest;
-        bytesRead += 6;
-        bytesRead += readPayload(stream, &message);
-        break;
-    case PeerToPeerMessage::RELAY_TRUNCATED:
-        // | 03 | tId | RELAY_TRUNCATED | streamId (2B) | digest (4B) | ??? (TODO)
-        stream >> message.streamId;
-        stream >> message.digest;
-        bytesRead += 6;
-        // TODO
-        break;
-    case PeerToPeerMessage::CMD_DESTROY:
-    case PeerToPeerMessage::CMD_COVER:
-        // no more data
-        break;
-    case PeerToPeerMessage::CMD_TRUNCATED:
-        // TODO
-        break;
-    case PeerToPeerMessage::CMD_INVALID:
-    default:
-        qDebug() << "Reading invalid message command" << message.command;
-        message.malformed = true;
-        break;
-    }
-
-    stream.skipRawData(MESSAGE_LENGTH - bytesRead);
-    return !message.malformed;
+    return size == source.size();
 }
 
