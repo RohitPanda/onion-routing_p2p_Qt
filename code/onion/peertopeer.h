@@ -10,6 +10,7 @@
 #include "messagetypes.h"
 #include "peertopeermessage.h"
 #include "sessionkeystore.h"
+#include "tunnelidmapper.h"
 
 // represents the UDP best effort connection to other onion modules.
 class PeerToPeer : public QObject
@@ -46,7 +47,7 @@ public slots:
 signals:
     // for OnionApi
     void tunnelReady(QTcpSocket *requestId, quint32 tunnelId, QByteArray hostkey);
-    void tunnelIncoming(quint32 tunnelId, QByteArray hostkey);
+    void tunnelIncoming(quint32 tunnelId);
     void tunnelData(quint32 tunnelId, QByteArray data);
     void tunnelError(quint32 tunnelId, MessageType lastMessage);
 
@@ -58,6 +59,8 @@ signals:
     void sessionIncomingHS1(quint32 requestId, QByteArray handshake);
     void sessionIncomingHS2(quint32 requestId, quint16 sessionId, QByteArray handshake);
 
+    void requestEndSession(quint16 session);
+
 private:    // structs
     enum HopStatus {
         Unconnected,
@@ -67,9 +70,11 @@ private:    // structs
     };
 
     struct HopState {
-        QByteArray ourHandshake;
         QByteArray peerHostkey;
         Binding peer;
+        quint16 circuitId = 0;
+        quint32 tunnelId = 0;
+
         HopStatus status = Unconnected;
 
         quint16 sessionKey; // with this peer
@@ -80,17 +85,22 @@ private:    // structs
     struct CircuitState {
         QVector<HopState> hopStates;
 
-        QByteArray buffer;
+        quint32 circuitApiTunnelId; // is the tunnelId for last hop.
+        MessageType lastMessage;
     };
 
     struct TunnelState {
         Binding previousHop;
         Binding nextHop;
 
+        quint16 circIdPreviousHop = 0;
+        quint16 circIdNextHop = 0;
+
         quint32 tunnelIdPreviousHop = 0;
         quint32 tunnelIdNextHop = 0;
 
         bool hasNextHop() const { return nextHop.isValid(); }
+        bool operator ==(const TunnelState &other) const;
     };
 
     struct OnionAuthRequest {
@@ -103,45 +113,57 @@ private:    // structs
         };
 
         ReqType type;
-        QByteArray preface; // unencrypted original header of the packet
         QVector<HopState> remainingHops; // remaining for encryption/decryption
-        quint32 tunnelId; // original tunnelid
+        quint16 circuitId; // original circid
 
         Binding peer; // source
         Binding nextHop; // dest - if applicable
-        quint32 nextHopTunnelId; // dest - if applicable
+        quint16 nextHopCircuitId; // dest - if applicable
         int operations = 0; // number of decrypts/encrypts on this request
     };
 private slots:
     void onDatagram();
     void handleDatagram(QNetworkDatagram datagram);
 
-    void handleBuild(const QNetworkDatagram &datagram, PeerToPeerMessage message);
-    void handleCreated(const QNetworkDatagram &datagram, PeerToPeerMessage message);
+    void handleBuild(PeerToPeerMessage message);
+    void handleCreated(PeerToPeerMessage message);
 
     // it is actually for us and decrypted
-    void handleMessage(PeerToPeerMessage message);
+    void handleMessage(PeerToPeerMessage message, quint32 originatorTunnelId);
 
     void continueLayeredDecrypt(OnionAuthRequest request, QByteArray payload);
     void continueLayeredEncrypt(OnionAuthRequest request, QByteArray payload);
 
-    // todo shouldn't I be inside PeerToPeerMessage?
-    void forwardEncryptedMessage(Binding to, quint32 tunnelId, QByteArray payload);
+    void forwardEncryptedMessage(Binding to, quint16 circuitId, QByteArray payload);
+    void sendPeerToPeerMessage(PeerToPeerMessage unencrypted, Binding target);
+    void sendPeerToPeerMessage(PeerToPeerMessage unencrypted, QVector<HopState> tunnel);
+
+    void tearCircuit(quint32 tunnelId); // sends destroy messages along the circuit
+    void cleanCircuit(quint32 tunnelId); // cleans up resources
 private:
+    TunnelIdMapper tunnelIds_;
+
     // maps a peer to our auth session id with that peer
     SessionKeystore sessions_;
 
     // all hashed by requestId as sent to auth
     QHash<quint32, OnionAuthRequest> encryptQueue_;
     QHash<quint32, OnionAuthRequest> decryptQueue_;
-    QHash<quint32, Binding> incomingTunnels_;
+    QHash<quint32, quint32> incomingTunnels_; // hashes auth reqId -> tunnelId
     quint32 nextAuthRequest_ = 1;
 
+    // hashes tunnelId of CREATED message to tunnelId of previous hop for a relay_extend
+    QHash<quint32, quint32> pendingTunnelExtensions_;
+
     // we're source here, tunnelId is src<->a
+    // tunnelId propagated to API is src<->dst!!
     QHash<quint32, CircuitState> circuits_;
     // we're in the path, thus two valid tunnelIds: a <-> us <-> b
     QList<TunnelState> tunnels_;
     quint32 nextTunnelId_ = 1;
+
+    TunnelState *findTunnelByPreviousHopId(quint32 tId);
+    TunnelState *findTunnelByNextHopId(quint32 tId);
 
     QUdpSocket socket_;
 

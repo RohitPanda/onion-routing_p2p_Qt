@@ -2,6 +2,7 @@
 #define BINDING_H
 
 #include <QHostAddress>
+#include <QHash>
 
 struct Binding {
     Binding() { }
@@ -12,8 +13,14 @@ struct Binding {
 
     QString toString() const { return QString("%1:%2").arg(address.toString(), QString::number(port)); }
     bool isValid() const { return !address.isNull() && port != 0; }
+
+    bool operator ==(const Binding &other) const {
+        return address == other.address && port == other.port;
+    }
 };
 
+
+inline uint qHash(Binding key) { return qHash(key.address) ^ qHash(key.port); }
 
 
 #endif // BINDING_H

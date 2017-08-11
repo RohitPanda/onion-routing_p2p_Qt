@@ -15,6 +15,8 @@ public:
 
         Binding binding;
         quint16 circId;
+
+        bool operator ==(const CircuitBinding &other) const;
     };
 
     quint32 tunnelId(Binding binding, quint16 circId);
@@ -30,5 +32,7 @@ private:
     QHash<CircuitBinding, quint32> forward_;
     quint32 nextTunnelId_ = 10;
 };
+
+uint qHash(TunnelIdMapper::CircuitBinding key);
 
 #endif // TUNNELIDMAPPER_H

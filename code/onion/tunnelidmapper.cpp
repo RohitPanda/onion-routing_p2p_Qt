@@ -51,3 +51,13 @@ QString TunnelIdMapper::describe(quint32 tunnelId)
     CircuitBinding id = backward_[tunnelId];
     return QString("%1@x%2").arg(id.binding.toString(), QString::number(id.circId, 16).rightJustified(4, '0'));
 }
+
+uint qHash(TunnelIdMapper::CircuitBinding key)
+{
+    return qHash(key.binding) ^ qHash(key.circId);
+}
+
+bool TunnelIdMapper::CircuitBinding::operator ==(const TunnelIdMapper::CircuitBinding &other) const
+{
+    return binding == other.binding && circId == other.circId;
+}

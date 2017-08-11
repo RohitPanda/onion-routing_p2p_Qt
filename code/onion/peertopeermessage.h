@@ -11,10 +11,9 @@
 // fixed-size: 1027 B
 // with three byte unencrypted, encrypted payload will be multiple of 128, eliminating padding for encryption
 #define MESSAGE_LENGTH 1027
-// we allow a hop length of up to 7
-//    -> relay data header is 7B -> reserve 12 * 7 = 84B for headers
-//    -> maximum unfragmented payload size on client / exit node should be 1024B - 84B = 940B
-#define MAX_RELAY_DATA_SIZE 940
+#define UNENCRYPTED_HEADER_LEN 3
+// we dont wrap packets, but encrypt the payload consequtively => no hop limit
+#define MAX_RELAY_DATA_SIZE 1024
 //
 // first byte indicates build (01) / created (02) / encrypted (03) message
 //
@@ -27,6 +26,7 @@
 //
 // command payload:
 // | 03 | CMD_DESTROY     | digest (4B) | reserved (2B) // to fit header size
+// | 03 | CMD_COVER       | digest (4B) | reserved (2B) // to fit header size
 // | 03 | RELAY_DATA      | digest (4B) | streamId (2B) | data_size (2B) | data
 // | 03 | RELAY_EXTEND    | digest (4B) | streamId (2B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
 // | 03 | RELAY_EXTENDED  | digest (4B) | streamId (2B) | handshake_len (2B) | handshake
@@ -83,6 +83,18 @@ public:
 
     Binding sender; // parsed from QNetworkDatagram if present
 
+public:
+    // factory shorthands
+    static PeerToPeerMessage makeBuild(quint16 circId, QByteArray handshake);
+    static PeerToPeerMessage makeCreated(quint16 circId, QByteArray handshake);
+    static PeerToPeerMessage makeRelayData(quint16 circId, quint16 streamId, QByteArray data);
+    static PeerToPeerMessage makeRelayExtend(quint16 circId, quint16 streamId, Binding targetAddress, QByteArray handshake);
+    static PeerToPeerMessage makeRelayExtended(quint16 circId, quint16 streamId, QByteArray handshake);
+    static PeerToPeerMessage makeRelayTruncated(quint16 circId, quint16 streamId);
+    static PeerToPeerMessage makeCommandDestroy(quint16 circId);
+    static PeerToPeerMessage makeCommandCover(quint16 circId);
+
+    // parsing
     static PeerToPeerMessage fromDatagram(QNetworkDatagram dgram);
     static PeerToPeerMessage fromBytes(QByteArray fullPacket);
 
@@ -90,12 +102,15 @@ public:
     static PeerToPeerMessage fromEncryptedPayload(QByteArray encryptedMessage); // ignores the preface 03 | circId
     static PeerToPeerMessage fromEncryptedPayload(QByteArray encryptedMessage, quint16 circId);
 
+    // exporting
     QByteArray toEncryptedPayload() const; // make a packet without header
     QByteArray toBytes() const; // make a full packet
     QNetworkDatagram toDatagram(Binding target = Binding()) const; // uses target or this.sender if sender is invalid
 
+    // compose a full message from the encrypted payload
+    static QByteArray composeEncrypted(quint16 circId, QByteArray encryptedPayload);
 private:
-    QByteArray pad(QByteArray packet, int length);
+    static QByteArray pad(QByteArray packet, int length);
 };
 
 // read a 16bit integer for length, and this amount of data after it into target message.

@@ -15,7 +15,7 @@ QString PeerToPeerMessage::typeString() const
     case PeerToPeerMessage::ENCRYPTED:
         switch (command) {
         case PeerToPeerMessage::CMD_INVALID:
-            return "ENCRYPTED <??>";
+            return "ENCRYPTED <?>";
         case PeerToPeerMessage::RELAY_DATA:
             return "ENCRYPTED -> RELAY_DATA";
         case PeerToPeerMessage::RELAY_EXTEND:
@@ -48,6 +48,95 @@ bool PeerToPeerMessage::isValidDigest() const
 {
     // digest is mock for now -> correct if 0
     return digest == 0;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeBuild(quint16 circId, QByteArray handshake)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::BUILD;
+    msg.circuitId = circId;
+    msg.data = handshake;
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeCreated(quint16 circId, QByteArray handshake)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::CREATED;
+    msg.circuitId = circId;
+    msg.data = handshake;
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeRelayData(quint16 circId, quint16 streamId, QByteArray data)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::RELAY_DATA;
+    msg.streamId = streamId;
+    msg.data = data;
+    msg.calculateDigest();
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeRelayExtend(quint16 circId, quint16 streamId, Binding targetAddress, QByteArray handshake)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::RELAY_EXTEND;
+    msg.streamId = streamId;
+    msg.address = targetAddress.address;
+    msg.port = targetAddress.port;
+    msg.data = handshake;
+    msg.calculateDigest();
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeRelayExtended(quint16 circId, quint16 streamId, QByteArray handshake)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::RELAY_EXTENDED;
+    msg.streamId = streamId;
+    msg.data = handshake;
+    msg.calculateDigest();
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeRelayTruncated(quint16 circId, quint16 streamId)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::RELAY_TRUNCATED;
+    msg.streamId = streamId;
+    msg.calculateDigest();
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeCommandDestroy(quint16 circId)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::CMD_DESTROY;
+    msg.streamId = 0;
+    msg.calculateDigest();
+    return msg;
+}
+
+PeerToPeerMessage PeerToPeerMessage::makeCommandCover(quint16 circId)
+{
+    PeerToPeerMessage msg;
+    msg.celltype = PeerToPeerMessage::ENCRYPTED;
+    msg.circuitId = circId;
+    msg.command = PeerToPeerMessage::CMD_DESTROY;
+    msg.streamId = 0;
+    msg.calculateDigest();
+    return msg;
 }
 
 PeerToPeerMessage PeerToPeerMessage::fromDatagram(QNetworkDatagram dgram)
@@ -91,7 +180,7 @@ PeerToPeerMessage PeerToPeerMessage::fromBytes(QByteArray fullPacket)
     }
 
     if(ctype != PeerToPeerMessage::ENCRYPTED) {
-        qDebug() << "invalid celltype fromBytes, got" << ctype();
+        qDebug() << "invalid celltype fromBytes, got" << ctype;
         PeerToPeerMessage response;
         response.malformed = true;
         return response;
@@ -114,7 +203,7 @@ PeerToPeerMessage PeerToPeerMessage::fromEncryptedPayload(QByteArray encryptedMe
     PeerToPeerMessage message;
     message.celltype = PeerToPeerMessage::ENCRYPTED;
     quint8 commandChar;
-    stream << commandChar << message.digest << message.streamId;
+    stream >> commandChar >> message.digest >> message.streamId;
 
     if(!message.isValidDigest()) {
         // message is still encrypted
@@ -157,7 +246,7 @@ PeerToPeerMessage PeerToPeerMessage::fromEncryptedPayload(QByteArray encryptedMe
         break;
     case PeerToPeerMessage::RELAY_EXTENDED:
         // handshake_len (2B) | handshake
-        message.malformed = !readPayload(stream, &message);
+        message.malformed = !readPayload(stream, &message.data);
         break;
     case PeerToPeerMessage::RELAY_TRUNCATED:
     case PeerToPeerMessage::CMD_DESTROY:
@@ -312,3 +401,15 @@ bool writePayload(QDataStream &stream, QByteArray source, quint16 maxSize)
     return size == source.size();
 }
 
+
+QByteArray PeerToPeerMessage::composeEncrypted(quint16 circId, QByteArray encryptedPayload)
+{
+    QByteArray arr;
+    QDataStream stream(&arr, QIODevice::ReadWrite);
+    stream.setByteOrder(QDataStream::BigEndian);
+
+    stream << static_cast<quint8>(PeerToPeerMessage::ENCRYPTED);
+    stream << circId;
+    stream.writeRawData(encryptedPayload.data(), encryptedPayload.length());
+    return PeerToPeerMessage::pad(arr, MESSAGE_LENGTH);
+}

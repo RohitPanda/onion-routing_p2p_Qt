@@ -17,7 +17,7 @@ void SessionKeystore::remove(quint32 tunnelId)
 
 quint16 SessionKeystore::get(quint32 tunnelId)
 {
-    return data_.value(binding);
+    return data_.value(tunnelId);
 }
 
 bool SessionKeystore::has(quint32 tunnelId)
