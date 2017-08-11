@@ -18,7 +18,9 @@ SOURCES += \
     settings.cpp \
     onionapi.cpp \
     rpsapi.cpp \
-    peertopeermessage.cpp
+    peertopeermessage.cpp \
+    sessionkeystore.cpp \
+    tunnelidmapper.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -40,7 +42,9 @@ HEADERS += \
     messagetypes.h \
     rpsapi.h \
     metatypes.h \
-    peertopeermessage.h
+    peertopeermessage.h \
+    sessionkeystore.h \
+    tunnelidmapper.h
 
 test{
 #    message(Configuring test build...)

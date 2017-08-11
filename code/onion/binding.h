@@ -4,6 +4,9 @@
 #include <QHostAddress>
 
 struct Binding {
+    Binding() { }
+    Binding(QHostAddress a, quint16 p) : address(a), port(p) { }
+
     QHostAddress address;
     quint16 port = 0;
 

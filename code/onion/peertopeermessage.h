@@ -5,30 +5,29 @@
 #include <QHostAddress>
 
 // layout
-// fixed-size: 1025 B
-// with one byte unencrypted, encrypted payload will be multiple of 128, eliminating padding for encryption
-#define MESSAGE_LENGTH 1025
+// fixed-size: 1027 B
+// with three byte unencrypted, encrypted payload will be multiple of 128, eliminating padding for encryption
+#define MESSAGE_LENGTH 1027
 // we allow a hop length of up to 7
-//    -> relay data header is 12B -> reserve 12 * 7 = 84B for headers
-//    -> maximum unfragmented payload size on client / exit node should be 941B
-#define MAX_RELAY_DATA_SIZE 941
+//    -> relay data header is 3B -> reserve 12 * 3 = 36B for headers
+//    -> maximum unfragmented payload size on client / exit node should be 1024B - 36B = 988B
+#define MAX_RELAY_DATA_SIZE 988
 //
 // first byte indicates build (01) / created (02) / encrypted (03) message
 //
-// build message:     | 01 | handshake_len (2B) | handshake
-// created message:   | 02 | handshake_len (2B) | handshake
-// encrypted message: | 03 | <payload>
+// build message:     | 01 | circ_id (2B) | handshake_len (2B) | handshake
+// created message:   | 02 | circ_id (2B) | handshake_len (2B) | handshake
+// encrypted message: | 03 | circ_id (2B) | <payload>
 //
-// payload:   | tunnelId (4B) | celltype (1B) | <command payload>
-// celltype can be CMD_DESTROY, CMD_TRUNCATED, RELAY_DATA, RELAY_EXTEND, RELAY_EXTENDED, RELAY_TRUNCATED
+// payload:   | streamId (2B) | celltype (1B) | <command payload>
+// celltype can be CMD_DESTROY, RELAY_DATA, RELAY_EXTEND, RELAY_EXTENDED, RELAY_TRUNCATED
 //
 // command payload:
-// | 03 | tId | CMD_DESTROY     | -
-// | 03 | tId | CMD_TRUNCATED   | ??? (TODO)
-// | 03 | tId | RELAY_DATA      | streamId (2B) | digest (4B) | data_size (2B) | data
-// | 03 | tId | RELAY_EXTEND    | streamId (2B) | digest (4B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
-// | 03 | tId | RELAY_EXTENDED  | streamId (2B) | digest (4B) | handshake_len (2B) | handshake
-// | 03 | tId | RELAY_TRUNCATED | streamId (2B) | digest (4B) | ??? (TODO)
+// | 03 | CMD_DESTROY     | -
+// | 03 | RELAY_DATA      | streamId (2B) | digest (4B) | data_size (2B) | data
+// | 03 | RELAY_EXTEND    | streamId (2B) | digest (4B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
+// | 03 | RELAY_EXTENDED  | streamId (2B) | digest (4B) | handshake_len (2B) | handshake
+// | 03 | RELAY_TRUNCATED | streamId (2B) | digest (4B) | ??? (TODO)
 
 class PeerToPeerMessage
 {
@@ -50,18 +49,20 @@ public:
         RELAY_EXTENDED = 0x03,
         RELAY_TRUNCATED = 0x04,
         CMD_DESTROY = 0x05,
-        CMD_TRUNCATED = 0x06,
         CMD_COVER = 0x07
     };
 
     bool isEncrypted() const { return celltype == ENCRYPTED; }
+
+    QString typeString() const;
+
     // compute digest after all other data is set
     void calculateDigest();
     bool isValidDigest() const;
 
     // general msg header
     Celltype celltype = Invalid;
-    quint32 tunnelId;
+    quint16 circuitId;
 
     // relay msg header
     Commandtype command = CMD_INVALID;

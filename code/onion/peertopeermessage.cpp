@@ -5,6 +5,41 @@ PeerToPeerMessage::PeerToPeerMessage()
 {
 }
 
+QString PeerToPeerMessage::typeString() const
+{
+    switch (celltype) {
+    case PeerToPeerMessage::BUILD:
+        return "BUILD";
+    case PeerToPeerMessage::CREATED:
+        return "CREATED";
+    case PeerToPeerMessage::ENCRYPTED:
+        switch (command) {
+        case PeerToPeerMessage::CMD_INVALID:
+            return "ENCRYPTED <??>";
+        case PeerToPeerMessage::RELAY_DATA:
+            return "ENCRYPTED -> RELAY_DATA";
+        case PeerToPeerMessage::RELAY_EXTEND:
+            return "ENCRYPTED -> RELAY_EXTEND";
+        case PeerToPeerMessage::RELAY_EXTENDED:
+            return "ENCRYPTED -> RELAY_EXTENDED";
+        case PeerToPeerMessage::RELAY_TRUNCATED:
+            return "ENCRYPTED -> RELAY_TRUNCATED";
+        case PeerToPeerMessage::CMD_DESTROY:
+            return "ENCRYPTED -> CMD_DESTROY";
+        case PeerToPeerMessage::CMD_TRUNCATED:
+            return "ENCRYPTED -> CMD_TRUNCATED";
+        case PeerToPeerMessage::CMD_COVER:
+            return "ENCRYPTED -> CMD_COVER";
+        default:
+            return "ENCRYPTED <invalid>";
+        }
+        break;
+    case PeerToPeerMessage::Invalid:
+    default:
+        return "<invalid celltype>";
+    }
+}
+
 void PeerToPeerMessage::calculateDigest()
 {
     // digest is mock (not crc) for now -> 0
@@ -148,7 +183,9 @@ bool peekMessage(QDataStream &stream, PeerToPeerMessage &message)
     }
 
     // encrypted message
-    // -> don't read payload
+    // -> read encrypted fixed-size header to allow encryption status check,
+    //    but don't read full payload, cause it might still be encrypted
+    // TODO fixme design change
     stream.skipRawData(MESSAGE_LENGTH - 1);
     return true;
 }
