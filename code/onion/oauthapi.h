@@ -21,8 +21,14 @@ public:
 
     void start();
 
-signals:
+    enum payloadType
+    {
+        PLAINTEXT = 0,
+        ENCRYPTED = 1
+    };
 
+signals:
+    void payloadFromAuthApi(QByteArray payload, payloadType type);
 
 public slots:
     void requestAuthSessionStart(Binding peer, QByteArray key);
@@ -30,8 +36,8 @@ public slots:
     void requestAuthSessionIncomingHS2(QByteArray hsp2);
     void requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload);
     void requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload);
-    void requestAuthCipherEncrypt(Binding peer, QByteArray payload, quint16 payload_type);
-    void requestAuthCipherDecrypt(Binding peer, QByteArray payload, quint16 payload_type);
+    void requestAuthCipherEncrypt(Binding peer, QByteArray payload, payloadType type);
+    void requestAuthCipherDecrypt(Binding peer, QByteArray payload, payloadType type);
     void requestAuthSessionClose(Binding peer);
 
 private slots:

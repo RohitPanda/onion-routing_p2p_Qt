@@ -62,15 +62,17 @@ void OAuthApi::requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryp
 
 }
 
-void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, quint16 payload_type)
+void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, OAuthApi::payloadType type)
 {
 
 }
 
-void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, quint16 payload_type)
+void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, OAuthApi::payloadType type)
 {
 
 }
+
+
 
 void OAuthApi::requestAuthSessionClose(Binding peer)
 {
@@ -180,12 +182,12 @@ void OAuthApi::onData()
 
 quint16 OAuthApi::getSessionId(Binding Peer)
 {
-
+    return 0;
 }
 
 bool OAuthApi::checkRequestId(quint16 sessionId, quint16 requestId)
 {
-
+    return true;
 }
 
 void OAuthApi::maybeReconnect()
