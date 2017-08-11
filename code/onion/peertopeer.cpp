@@ -479,12 +479,31 @@ void PeerToPeer::buildTunnel(QHostAddress destinationAddr, quint16 destinationPo
 
 void PeerToPeer::destroyTunnel(quint32 tunnelId)
 {
-
+    // find circuit with end-to-start tunnelid
+    for(QHash<quint32, CircuitState>::iterator it = circuits_.begin(); it != circuits_.end(); it++) {
+        CircuitState &state = it.value();
+        if(state.circuitApiTunnelId == tunnelId) {
+            state.lastMessage = MessageType::ONION_TUNNEL_DESTROY;
+            destroyTunnel(it.key());
+            return;
+        }
+    }
 }
 
 bool PeerToPeer::sendData(quint32 tunnelId, QByteArray data)
 {
-    return true;
+    // find circuit with end-to-start tunnelid
+    for(QHash<quint32, CircuitState>::iterator it = circuits_.begin(); it != circuits_.end(); it++) {
+        CircuitState &state = it.value();
+        if(state.circuitApiTunnelId == tunnelId) {
+            state.lastMessage = MessageType::ONION_TUNNEL_DATA;
+            PeerToPeerMessage message = PeerToPeerMessage::makeRelayData(0, 0, data);
+            sendPeerToPeerMessage(message, state.hopStates);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void PeerToPeer::coverTunnel(quint16 size)
@@ -498,6 +517,7 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
     // a) in iterative encrypting of a request
     // b) encrypted a tunnel message we should forward
 
+    Q_UNUSED(sessionId);
     OnionAuthRequest storage = encryptQueue_.take(requestId);
 
     if(storage.type == OnionAuthRequest::EncryptOnce) {
