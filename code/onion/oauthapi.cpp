@@ -37,6 +37,81 @@ void OAuthApi::start()
     socket_.connectToHost(host_, port_);
 }
 
+void OAuthApi::requestAuthSessionStart(Binding peer, QByteArray key)
+{
+
+}
+
+void OAuthApi::requestAuthSessionIncomingHS1(QByteArray hsp1)
+{
+
+}
+
+void OAuthApi::requestAuthSessionIncomingHS2(QByteArray hsp2)
+{
+
+}
+
+void OAuthApi::requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload)
+{
+
+}
+
+void OAuthApi::requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload)
+{
+
+}
+
+void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, quint16 payload_type)
+{
+
+}
+
+void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, quint16 payload_type)
+{
+
+}
+
+void OAuthApi::requestAuthSessionClose(Binding peer)
+{
+
+}
+
+void OAuthApi::readAuthSessionHS1()
+{
+
+}
+
+void OAuthApi::readAuthSessionHS2()
+{
+
+}
+
+void OAuthApi::readAuthLayerEncryptResp()
+{
+
+}
+
+void OAuthApi::readAuthLayerDecryptResp()
+{
+
+}
+
+void OAuthApi::readAuthCipherEncryptResp()
+{
+
+}
+
+void OAuthApi::readAuthCipherDecryptResp()
+{
+
+}
+
+void OAuthApi::readAuthError()
+{
+
+}
+
 void OAuthApi::onData()
 {
     buffer_.append(socket_.readAll());
@@ -67,25 +142,50 @@ void OAuthApi::onData()
     MessageType type = (MessageType)messageTypeInt;
 
     switch (type) {
+
     case MessageType::AUTH_SESSION_HS1:
+        readAuthSessionHS1();
         break;
+
     case MessageType::AUTH_SESSION_INCOMING_HS2:
+        readAuthSessionHS2();
         break;
+
     case MessageType::AUTH_LAYER_ENCRYPT_RESP:
+        readAuthLayerEncryptResp();
         break;
+
     case MessageType::AUTH_LAYER_DECRYPT_RESP:
+        readAuthLayerDecryptResp();
         break;
+
     case MessageType::AUTH_CIPHER_ENCRYPT_RESP:
+        readAuthCipherEncryptResp();
         break;
+
     case MessageType::AUTH_CIPHER_DECRYPT_RESP:
+        readAuthCipherDecryptResp();
         break;
+
     case MessageType::AUTH_ERROR:
+        readAuthError();
         qDebug() << "oauth-api: cannot command a onion signal-type ->" << messageTypeInt << "discarding message";
         break;
+
     default:
         qDebug() << "oauth-api: discarding message of invalid type" << messageTypeInt;
         break;
     }
+}
+
+quint16 OAuthApi::getSessionId(Binding Peer)
+{
+
+}
+
+bool OAuthApi::checkRequestId(quint16 sessionId, quint16 requestId)
+{
+
 }
 
 void OAuthApi::maybeReconnect()
