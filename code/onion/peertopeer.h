@@ -11,6 +11,7 @@
 #include "peertopeermessage.h"
 #include "sessionkeystore.h"
 #include "tunnelidmapper.h"
+#include "peersampler.h"
 
 // represents the UDP best effort connection to other onion modules.
 class PeerToPeer : public QObject
@@ -29,10 +30,12 @@ public:
 
     int nHops() const;
     void setNHops(int nHops);
+
+    void setPeerSampler(PeerSampler *sampler);
     
 public slots:
     // from OnionApi
-    void buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QTcpSocket *requestId);
+    void buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QByteArray hostkey, QTcpSocket *requestId);
     void destroyTunnel(quint32 tunnelId);
     bool sendData(quint32 tunnelId, QByteArray data);
     void coverTunnel(quint16 size);
@@ -71,6 +74,7 @@ private:    // structs
 
     struct HopState {
         QByteArray peerHostkey;
+        QByteArray peerHandshakeHS1; // us -> him
         Binding peer;
         quint16 circuitId = 0;
         quint32 tunnelId = 0;
@@ -78,7 +82,6 @@ private:    // structs
         HopStatus status = Unconnected;
 
         quint16 sessionKey; // with this peer
-        // TODO
     };
 
     // state of a circuit (src==us, a, b, ..., dest)
@@ -87,6 +90,9 @@ private:    // structs
 
         quint32 circuitApiTunnelId; // is the tunnelId for last hop.
         MessageType lastMessage;
+
+        int remainingCoverData = 0; // if this is a cover tunnel
+        QTcpSocket *requesterId = nullptr;
     };
 
     struct TunnelState {
@@ -120,7 +126,32 @@ private:    // structs
         Binding nextHop; // dest - if applicable
         quint16 nextHopCircuitId; // dest - if applicable
         int operations = 0; // number of decrypts/encrypts on this request
+
+        QString debugString;
     };
+
+    struct PeerSample {
+        bool isBuildTunnel = false;
+        PeerSampler::Peer dest;
+        quint16 coverTrafficBytes;
+        QTcpSocket *requesterId = nullptr;
+    };
+
+    struct BuildTunnelPeer {
+        Binding peer;
+        QByteArray hostkey;
+        QByteArray handshake;
+        quint32 authRequestId = 0;
+        quint16 sessionId;
+    };
+
+    struct CircuitHandshakes {
+        bool isBuildTunnel = false;
+        quint16 coverTrafficBytes;
+        QList<BuildTunnelPeer> peers;
+        QTcpSocket *requesterId = nullptr;
+    };
+
 private slots:
     void onDatagram();
     void handleDatagram(QNetworkDatagram datagram);
@@ -140,6 +171,12 @@ private slots:
 
     void tearCircuit(quint32 tunnelId); // sends destroy messages along the circuit
     void cleanCircuit(quint32 tunnelId); // cleans up resources
+
+    void peersArrived(int id, QList<PeerSampler::Peer> peers);
+    void continueBuildingTunnel(quint32 id);
+    void sendCoverData(quint32 tunnelId);
+
+    void disconnectPeer(Binding who);
 private:
     TunnelIdMapper tunnelIds_;
 
@@ -154,6 +191,9 @@ private:
 
     // hashes tunnelId of CREATED message to tunnelId of previous hop for a relay_extend
     QHash<quint32, quint32> pendingTunnelExtensions_;
+
+    QHash<int, PeerSample> pendingPeerSamples_;
+    QList<CircuitHandshakes> pendingCircuitHandshakes_;
 
     // we're source here, tunnelId is src<->a
     // tunnelId propagated to API is src<->dst!!
@@ -170,6 +210,8 @@ private:
     QHostAddress interface_;
     int port_;
     int nHops_ = 2;
+
+    PeerSampler *peerSampler_ = nullptr;
 };
 
 #endif // PEERTOPEER_H

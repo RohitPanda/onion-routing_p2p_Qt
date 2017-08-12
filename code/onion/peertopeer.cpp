@@ -49,7 +49,8 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
     QByteArray data = datagram.data();
     if(data.size() != MESSAGE_LENGTH) {
         qDebug() << "P2P data with invalid length" << data.size() << "should be" << MESSAGE_LENGTH;
-        // TODO close connection to peer
+        disconnectPeer(Binding(datagram.senderAddress(), datagram.senderPort()));
+        return;
     }
 
     PeerToPeerMessage message = PeerToPeerMessage::fromDatagram(datagram);
@@ -59,7 +60,8 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
     if(message.malformed) {
         qDebug() << "P2P malformed message from" << peer.toString() << message.typeString()
                  << "; closing connection.";
-        // TODO close connection to peer
+        disconnectPeer(Binding(datagram.senderAddress(), datagram.senderPort()));
+        return;
     }
 
     if(message.celltype == PeerToPeerMessage::BUILD) {
@@ -172,7 +174,6 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
     // tunnel not found
     qDebug() << "Discarding message with unknown tunnelId" << tunnelId << "<=>"
              << tunnelIds_.describe(tunnelId);
-    // TODO close connection to peer?
 }
 
 void PeerToPeer::handleBuild(PeerToPeerMessage message)
@@ -213,11 +214,21 @@ void PeerToPeer::handleCreated(PeerToPeerMessage message)
     }
 
 
-    // TODO  a) OR orphaned
+    // if a), can only be the first hop, thus nextHopTunnelId is the circuit's tunnelId
+    if(!circuits_.contains(nextHopTunnelId)) {
+        qDebug() << "orphaned CREATED message received from" << tunnelIds_.describe(nextHopTunnelId);
+        return;
+    }
+
+    // a)
+    CircuitState &state = circuits_[nextHopTunnelId];
+    HopState &hop = state.hopStates.first();
     // finish handshake -> send to auth
-    // TODO
-    // also check if we need pendingTunnels_ above for this case
-    // emit sessionIncomingHS2(nextAuthRequest_++, data.authSessionId, message.data);
+    sessionIncomingHS2(nextAuthRequest_++, hop.sessionKey, message.data);
+    // set status in circuit
+    hop.status = Created;
+    // continue circuit build
+    continueBuildingTunnel(nextHopTunnelId);
 }
 
 void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunnelId)
@@ -249,15 +260,47 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         // send build with handshake we got
         PeerToPeerMessage build = PeerToPeerMessage::makeBuild(nextHopCircuitId, message.data);
         QNetworkDatagram dgram = build.toDatagram(nexthop); // cant encrypt this message, directly send
+        qDebug() << "RELAY_EXTEND -> sending build to" << nexthop.toString();
         socket_.writeDatagram(dgram);
         // await created, then send relay_extended
     }
         break;
     case PeerToPeerMessage::RELAY_EXTENDED:
-        // get circuit that we extended?
-        // emit sessionIncomingHS2
-        // -> continue in callback: continue building tunnel or emit tunnelReady
-        // TODO make this with buildTunnel
+    {
+        // get circuit that we extended -> circuitId is tunnelId of this message
+        quint32 circuitTunnelId = tunnelIds_.tunnelId(message.sender, message.circuitId);
+
+        if(!circuits_.contains(circuitTunnelId)) {
+            qDebug() << "orphaned RELAY_EXTENDED received from neighbour"
+                     << tunnelIds_.describe(circuitTunnelId) << "originator"
+                     << tunnelIds_.describe(originatorTunnelId);
+            return;
+        }
+
+        CircuitState &state = circuits_[circuitTunnelId];
+        for(int i = 0; i < state.hopStates.size(); i++) {
+            HopState &hopState = state.hopStates[i];
+            if(hopState.status == BuildSent) {
+                // verify that originator is the hop before this one
+                if(i > 0) {
+                    if(state.hopStates[i - 1].tunnelId != originatorTunnelId) {
+                        qDebug() << "RELAY_EXTENDED does not fit tunnel state: originator should be"
+                                 << tunnelIds_.describe(state.hopStates[i - 1].tunnelId)
+                                 << "but is" << tunnelIds_.describe(originatorTunnelId);
+                    }
+                }
+
+                // finish session establishment
+                sessionIncomingHS2(nextAuthRequest_++, hopState.sessionKey, message.data);
+                // apply state change
+                hopState.status = Created;
+                // continue building tunnel
+                continueBuildingTunnel(circuitTunnelId);
+                return;
+            }
+        }
+        qDebug() << "orphaned RELAY_EXTENDED received. Tunnel is already built.";
+    }
         break;
     case PeerToPeerMessage::RELAY_TRUNCATED:
         // should only come from later hop to us when we started the circuit
@@ -383,6 +426,7 @@ void PeerToPeer::sendPeerToPeerMessage(PeerToPeerMessage unencrypted, Binding ta
     request.type = OnionAuthRequest::EncryptOnce;
     request.nextHop = target;
     request.nextHopCircuitId = unencrypted.circuitId;
+    request.debugString = QString("direct-encrypt %1 to %2").arg(unencrypted.typeString(), target.toString());
 
     quint16 sessionId = sessions_.get(tunnelIds_.tunnelId(target, unencrypted.circuitId));
     quint32 reqId = nextAuthRequest_++;
@@ -403,6 +447,7 @@ void PeerToPeer::sendPeerToPeerMessage(PeerToPeerMessage unencrypted, QVector<Pe
     request.nextHop = tunnel[0].peer;
     request.nextHopCircuitId = tunnel[0].circuitId;
     request.remainingHops = tunnel;
+    request.debugString = QString("onion-encrypt %1 towards %2").arg(unencrypted.typeString(), tunnel.last().peer.toString());
 
     continueLayeredEncrypt(request, msgPayload);
 }
@@ -440,6 +485,119 @@ void PeerToPeer::cleanCircuit(quint32 tunnelId)
     }
 }
 
+void PeerToPeer::peersArrived(int id, QList<PeerSampler::Peer> peers)
+{
+    if(!pendingPeerSamples_.contains(id)) {
+        qDebug() << "peersArrived: unknown sample id";
+        return;
+    }
+    PeerSample sample = pendingPeerSamples_.take(id);
+    if(sample.isBuildTunnel) {
+        peers.append(sample.dest);
+    }
+
+    // get handshake for each peer
+    CircuitHandshakes handshakes;
+    handshakes.coverTrafficBytes = sample.coverTrafficBytes;
+    handshakes.isBuildTunnel = sample.isBuildTunnel;
+    handshakes.requesterId = sample.requesterId;
+
+    for(auto hop : peers) {
+        BuildTunnelPeer peer;
+        peer.peer = hop.address;
+        peer.hostkey = hop.hostkey;
+        peer.authRequestId = nextAuthRequest_++;
+        handshakes.peers.append(peer);
+    }
+
+    pendingCircuitHandshakes_.append(handshakes);
+    for(auto peer : handshakes.peers) {
+        // request actual handshake from auth only after inserting data
+        requestStartSession(peer.authRequestId, peer.hostkey);
+    }
+}
+
+void PeerToPeer::continueBuildingTunnel(quint32 id)
+{
+    if(!circuits_.contains(id)) {
+        return;
+    }
+
+    CircuitState &state = circuits_[id];
+    int nextBuildIndex = -1;
+    for(int i = 0; i < state.hopStates.size(); i++) {
+        HopState &hop = state.hopStates[i];
+        if(hop.status == Created) {
+            continue;
+        } else if(hop.status == BuildSent) {
+            // wait more
+            return;
+        } else {
+            // establish with this hop
+            nextBuildIndex = i;
+            break;
+        }
+    }
+
+    if(nextBuildIndex == -1) {
+        // tunnel is ready
+        if(state.remainingCoverData > 0) {
+            sendCoverData(id);
+        } else {
+            tunnelReady(state.requesterId, state.circuitApiTunnelId, state.hopStates.last().peerHostkey);
+        }
+        return;
+    }
+
+    // send build / extend & set status
+    HopState &nextHopState = state.hopStates[nextBuildIndex];
+    nextHopState.status = BuildSent;
+    quint16 circId = state.hopStates.first().circuitId;
+    if(nextBuildIndex == 0) {
+        // send a build
+        PeerToPeerMessage build = PeerToPeerMessage::makeBuild(circId, nextHopState.peerHandshakeHS1);
+        QNetworkDatagram dgram = build.toDatagram(nextHopState.peer);
+        qDebug() << "building circuit -> sent build to" << nextHopState.peer.toString();
+        socket_.writeDatagram(dgram);
+    } else {
+        // send a relay extend
+        QVector<HopState> halfOnion = state.hopStates.mid(0, nextBuildIndex); // should go until predecessor of nextHop
+        PeerToPeerMessage extend = PeerToPeerMessage::makeRelayExtend(circId, 0, nextHopState.peer, nextHopState.peerHandshakeHS1);
+        sendPeerToPeerMessage(extend, halfOnion);
+    }
+}
+
+void PeerToPeer::sendCoverData(quint32 tunnelId)
+{
+    if(!circuits_.contains(tunnelId)) {
+        return;
+    }
+
+    CircuitState &state = circuits_[tunnelId];
+    if(state.remainingCoverData <= 0) {
+        return;
+    }
+
+    state.remainingCoverData -= MESSAGE_LENGTH;
+    PeerToPeerMessage message = PeerToPeerMessage::makeCommandCover(state.hopStates.first().circuitId);
+    sendPeerToPeerMessage(message, state.hopStates);
+
+    // random backoff for next cover message
+    float rand = (float)qrand() / (float)RAND_MAX;
+    int minWait = 300, maxWait = 2000;
+    int wait = (int)((maxWait - minWait) * rand) + minWait;
+
+    QTimer::singleShot(wait, [=]() { sendCoverData(tunnelId); });
+}
+
+void PeerToPeer::disconnectPeer(Binding who)
+{
+    // phew this is a lot
+    // tear circuits with this guy
+    // tear tunnels with this guy
+    // don't do anything yet so we can debug properly
+}
+
 PeerToPeer::TunnelState *PeerToPeer::findTunnelByPreviousHopId(quint32 tId)
 {
     for(TunnelState &candidate : tunnels_) {
@@ -472,9 +630,26 @@ void PeerToPeer::setNHops(int nHops)
     nHops_ = nHops;
 }
 
-void PeerToPeer::buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QTcpSocket *requestId)
+void PeerToPeer::setPeerSampler(PeerSampler *sampler)
 {
+    peerSampler_ = sampler;
+    connect(sampler, &PeerSampler::peersArrived, this, &PeerToPeer::peersArrived);
+}
 
+void PeerToPeer::buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QByteArray hostkey, QTcpSocket *requestId)
+{
+    // get some middle peers
+    PeerSample sample;
+    sample.isBuildTunnel = true;
+    PeerSampler::Peer dest;
+    dest.address = Binding(destinationAddr, destinationPort);
+    dest.hostkey = hostkey;
+    sample.dest = dest;
+    sample.requesterId = requestId;
+
+    int sampleId = peerSampler_->requestPeers(nHops_);
+    pendingPeerSamples_[sampleId] = sample;
+    // wait for peersArrived()
 }
 
 void PeerToPeer::destroyTunnel(quint32 tunnelId)
@@ -522,7 +697,14 @@ bool PeerToPeer::sendData(quint32 tunnelId, QByteArray data)
 
 void PeerToPeer::coverTunnel(quint16 size)
 {
+    // get some peers
+    PeerSample sample;
+    sample.isBuildTunnel = false;
+    sample.coverTrafficBytes = size;
 
+    int sampleId = peerSampler_->requestPeers(nHops_ + 1); // add 1 for random dest
+    pendingPeerSamples_[sampleId] = sample;
+    // wait for peersArrived()
 }
 
 void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray payload)
@@ -541,6 +723,7 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
             return;
         }
 
+        qDebug() << "sending encrypt-once message ->" << storage.debugString;
         forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
         return;
     }
@@ -549,6 +732,7 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
         // a)
         if(storage.remainingHops.isEmpty()) {
             // done encrypting, send to first hop in circuit
+            qDebug() << "sending encrypt-onion message ->" << storage.debugString;
             forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
         }
 
@@ -609,6 +793,7 @@ void PeerToPeer::onDecrypted(quint32 requestId, QByteArray payload)
             return;
         }
 
+        qDebug() << "forwarding peeled, but still encrypted packet along tunnel" << storage.nextHop.toString();
         forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
         return;
     }
@@ -624,7 +809,46 @@ void PeerToPeer::onDecrypted(quint32 requestId, QByteArray payload)
 
 void PeerToPeer::onSessionHS1(quint32 requestId, quint16 sessionId, QByteArray handshake)
 {
-    // TODO
+    // find our stuff in pendingHandshakes
+    for(QList<CircuitHandshakes>::iterator it = pendingCircuitHandshakes_.begin(); it != pendingCircuitHandshakes_.end();) {
+        bool done = true;
+        for(BuildTunnelPeer &hop : it->peers) {
+            if(hop.authRequestId == requestId) {
+                hop.handshake = handshake;
+                hop.sessionId = sessionId;
+            }
+            if(hop.handshake.isEmpty()) {
+                done = false;
+            }
+        }
+
+        if(done) {
+            // start building the tunnel
+            CircuitState circuit;
+            for(BuildTunnelPeer hop : it->peers) {
+                HopState hopState;
+                hopState.peer = hop.peer;
+                hopState.sessionKey = hop.sessionId;
+                hopState.peerHostkey = hop.hostkey;
+                hopState.peerHandshakeHS1 = hop.handshake;
+                hopState.status = Unconnected;
+                hopState.circuitId = tunnelIds_.nextCircId(hopState.peer);
+                hopState.tunnelId = tunnelIds_.tunnelId(hopState.peer, hopState.circuitId);
+                circuit.hopStates.append(hopState);
+            }
+            circuit.requesterId = it->requesterId;
+            circuit.circuitApiTunnelId = circuit.hopStates.last().tunnelId;
+            circuit.lastMessage = it->isBuildTunnel ? MessageType::ONION_TUNNEL_BUILD : MessageType::ONION_COVER;
+            circuit.remainingCoverData = it->isBuildTunnel ? 0 : it->coverTrafficBytes;
+            quint32 circuitId = circuit.hopStates.first().tunnelId;
+            circuits_[circuitId] = circuit;
+            continueBuildingTunnel(circuitId);
+
+            it = pendingCircuitHandshakes_.erase(it);
+        } else {
+            it++;
+        }
+    }
 }
 
 void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray handshake)
@@ -650,6 +874,7 @@ void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray h
     // send back handshake in a CREATED message
     PeerToPeerMessage created = PeerToPeerMessage::makeCreated(previousHopCircuitId, handshake);
     QNetworkDatagram dgram = created.toDatagram(previousHop);
+    qDebug() << "incoming tunnel -> sent CREATED to" << previousHop.toString();
     socket_.writeDatagram(dgram);
 
     // announce tunnel

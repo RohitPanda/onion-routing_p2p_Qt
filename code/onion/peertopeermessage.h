@@ -30,7 +30,7 @@
 // | 03 | RELAY_DATA      | digest (4B) | streamId (2B) | data_size (2B) | data
 // | 03 | RELAY_EXTEND    | digest (4B) | streamId (2B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
 // | 03 | RELAY_EXTENDED  | digest (4B) | streamId (2B) | handshake_len (2B) | handshake
-// | 03 | RELAY_TRUNCATED | digest (4B) | streamId (2B) | ??? (TODO)
+// | 03 | RELAY_TRUNCATED | digest (4B) | streamId (2B) | --
 
 class PeerToPeerMessage
 {
