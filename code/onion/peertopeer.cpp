@@ -488,6 +488,20 @@ void PeerToPeer::destroyTunnel(quint32 tunnelId)
             return;
         }
     }
+
+    // find tunnel with tunnelid
+    TunnelState *state = findTunnelByPreviousHopId(tunnelId);
+    if(state != nullptr) {
+        // cleanup tunnel
+        requestEndSession(state->tunnelIdPreviousHop);
+        sessions_.remove(state->tunnelIdPreviousHop);
+
+        // send truncated to source
+        PeerToPeerMessage message = PeerToPeerMessage::makeRelayTruncated(state->circIdPreviousHop, 0);
+        sendPeerToPeerMessage(message, state->previousHop);
+
+        tunnels_.removeOne(*state);
+    }
 }
 
 bool PeerToPeer::sendData(quint32 tunnelId, QByteArray data)
