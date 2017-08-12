@@ -6,6 +6,8 @@
 #include "onionapi.h"
 #include "peertopeer.h"
 #include "settings.h"
+#include "oauthapi.h"
+#include "rpsapi.h"
 
 class Controller : public QObject
 {
@@ -16,10 +18,14 @@ public:
     bool start();
 
 private:
-    void readHostkey(QString file);
+    QByteArray readHostkey(QString file);
 
     OnionApi onionApi_;
     PeerToPeer p2p_;
+    RPSApi rpsApi_;
+    OAuthApi oAuthApi_;
+
+    PeerSampler rpsApiProxy_;
 
     QByteArray hostkey_;
 
