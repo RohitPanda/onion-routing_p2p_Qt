@@ -7,113 +7,89 @@ PeerToPeerMessageTester::PeerToPeerMessageTester(QObject *parent) : QObject(pare
 
 void PeerToPeerMessageTester::testCmdBuild()
 {
-    PeerToPeerMessage message;
-    message.celltype = PeerToPeerMessage::BUILD;
+    PeerToPeerMessage message = PeerToPeerMessage::makeBuild(768, QByteArray("SRC-OR1-HOSTKEY"));
 
-    message.data = QByteArray("SRC-OR1-HOSTKEY");
-
-    verifyWritePayload(message, QByteArray::fromHex("01000F5352432d4f52312d484f53544b4559"));
+    verifyWritePayload(message, QByteArray::fromHex("010300000F5352432d4f52312d484f53544b4559"));
 
     // backwards:
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("01000F4f52312d5352432d484f53544b4559"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("010300000F4f52312d5352432d484f53544b4559"));
 
+    QCOMPARE(out.circuitId, (quint16)768);
     QCOMPARE(out.celltype, PeerToPeerMessage::BUILD);
     QCOMPARE(out.data, QByteArray("OR1-SRC-HOSTKEY"));
 }
 
 void PeerToPeerMessageTester::testCmdCreated()
 {
-    PeerToPeerMessage message;
-    message.celltype = PeerToPeerMessage::CREATED;
-    message.data = QByteArray("OR1-SRC-HOSTKEY");
+    PeerToPeerMessage message = PeerToPeerMessage::makeCreated(768, QByteArray("OR1-SRC-HOSTKEY"));
 
-    verifyWritePayload(message, QByteArray::fromHex("02000F4f52312d5352432d484f53544b4559"));
+    verifyWritePayload(message, QByteArray::fromHex("020300000F4f52312d5352432d484f53544b4559"));
 
     // backwards:
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("02000F4f52312d5352432d484f53544b4559"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("020300000F4f52312d5352432d484f53544b4559"));
 
+    QCOMPARE(out.circuitId, (quint16)768);
     QCOMPARE(out.celltype, PeerToPeerMessage::CREATED);
     QCOMPARE(out.data, QByteArray("OR1-SRC-HOSTKEY"));
 }
 
 void PeerToPeerMessageTester::testCmdDestroy()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 111623;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::CMD_DESTROY;
+    PeerToPeerMessage message = PeerToPeerMessage::makeCommandDestroy(3840);
 
-    verifyWritePayload(message, QByteArray::fromHex("030001B40705"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0005000000000000"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030001B40705"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0005000000000000"));
 
-    QCOMPARE(out.tunnelId, (quint32)111623);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::CMD_DESTROY);
 }
 
 void PeerToPeerMessageTester::testCmdCover()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 111623;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::CMD_COVER;
+    PeerToPeerMessage message = PeerToPeerMessage::makeCommandCover(3840);
 
-    verifyWritePayload(message, QByteArray::fromHex("030001B40707"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0007000000000000"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030001B40707"));
-    QCOMPARE(out.tunnelId, (quint32)111623);
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0007000000000000"));
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::CMD_COVER);
 }
 
 void PeerToPeerMessageTester::testRelayData()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 5879;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::RELAY_DATA;
-    message.streamId = 17;
-    message.data = "HALLO123";
-    message.calculateDigest();
+    PeerToPeerMessage message = PeerToPeerMessage::makeRelayData(3840, 1792, "HALLO123");
 
-    verifyWritePayload(message, QByteArray::fromHex("03000016f701001100000000000848414c4c4f313233"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0001000000000700000848414c4c4f313233"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030000053901001100000000000848414c4c4f343536"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0001000000000700000848414c4c4f313233"));
 
-    QCOMPARE(out.tunnelId, (quint32)1337);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::RELAY_DATA);
-    QCOMPARE(out.streamId, (quint16)17);
-    QVERIFY(out.isValidDigest());
-    QCOMPARE(out.data, QByteArray("HALLO456"));
+    QCOMPARE(out.streamId, (quint16)1792);
+    QCOMPARE(out.data, QByteArray("HALLO123"));
 }
 
 void PeerToPeerMessageTester::testRelayExtend4()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 5879;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::RELAY_EXTEND;
-    message.streamId = 17;
-    message.port = 8080;
-    message.address.setAddress(QHostAddress::LocalHost);
-    message.data = "HOSTKEY_";
-    message.calculateDigest();
+    Binding target(QHostAddress::LocalHost, 8080);
+    PeerToPeerMessage message = PeerToPeerMessage::makeRelayExtend(3840, 4352, target, "HOSTKEY_");
 
-    verifyWritePayload(message, QByteArray::fromHex("03000016f702001100000000047f0000011f900008484f53544b45595f"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0002000000001100047f0000011f900008484f53544b45595f"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("03000016f702001100000000047f0000011f900008484f53544b45595f"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0002000000001100047f0000011f900008484f53544b45595f"));
 
-    QCOMPARE(out.tunnelId, (quint32)5879);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::RELAY_EXTEND);
-    QCOMPARE(out.streamId, (quint16)17);
-    QVERIFY(out.isValidDigest());
+    QCOMPARE(out.streamId, (quint16)4352);
     QCOMPARE(out.data, QByteArray("HOSTKEY_"));
     QCOMPARE(out.address.protocol(), QAbstractSocket::IPv4Protocol);
     QCOMPARE(out.address, QHostAddress(QHostAddress::LocalHost));
@@ -122,26 +98,18 @@ void PeerToPeerMessageTester::testRelayExtend4()
 
 void PeerToPeerMessageTester::testRelayExtend6()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 5879;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::RELAY_EXTEND;
-    message.streamId = 17;
-    message.port = 8080;
-    message.address.setAddress(QHostAddress::LocalHostIPv6);
-    message.data = "HOSTKEY_";
-    message.calculateDigest();
+    Binding target(QHostAddress::LocalHostIPv6, 8080);
+    PeerToPeerMessage message = PeerToPeerMessage::makeRelayExtend(3840, 4352, target, "HOSTKEY_");
 
-    verifyWritePayload(message, QByteArray::fromHex("03000016f70200110000000006000000000000000000000000000000011f900008484f53544b45595f"));
+    verifyWritePayload(message, QByteArray::fromHex("030F000200000000110006000000000000000000000000000000011f900008484f53544b45595f"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("03000016f70200110000000006000000000000000000000000000000011f900008484f53544b45595f"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F000200000000110006000000000000000000000000000000011f900008484f53544b45595f"));
 
-    QCOMPARE(out.tunnelId, (quint32)5879);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::RELAY_EXTEND);
-    QCOMPARE(out.streamId, (quint16)17);
-    QVERIFY(out.isValidDigest());
+    QCOMPARE(out.streamId, (quint16)4352);
     QCOMPARE(out.data, QByteArray("HOSTKEY_"));
     QCOMPARE(out.address.protocol(), QAbstractSocket::IPv6Protocol);
     QCOMPARE(out.address, QHostAddress(QHostAddress::LocalHostIPv6));
@@ -150,55 +118,39 @@ void PeerToPeerMessageTester::testRelayExtend6()
 
 void PeerToPeerMessageTester::testRelayExtended()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 5879;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::RELAY_EXTENDED;
-    message.streamId = 17;
-    message.data = "HALLO123";
-    message.calculateDigest();
+    PeerToPeerMessage message = PeerToPeerMessage::makeRelayExtended(3840, 4352, "HALLO123");
 
-    verifyWritePayload(message, QByteArray::fromHex("03000016f703001100000000000848414c4c4f313233"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0003000000001100000848414c4c4f313233"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030000053903001100000000000848414c4c4f343536"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0003000000001100000848414c4c4f343536"));
 
-    QCOMPARE(out.tunnelId, (quint32)1337);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::RELAY_EXTENDED);
-    QCOMPARE(out.streamId, (quint16)17);
-    QVERIFY(out.isValidDigest());
+    QCOMPARE(out.streamId, (quint16)4352);
     QCOMPARE(out.data, QByteArray("HALLO456"));
 }
 
 void PeerToPeerMessageTester::testRelayTruncated()
 {
-    PeerToPeerMessage message;
-    message.tunnelId = 5879;
-    message.celltype = PeerToPeerMessage::ENCRYPTED;
-    message.command = PeerToPeerMessage::RELAY_TRUNCATED;
-    message.streamId = 17;
-    message.calculateDigest();
+    PeerToPeerMessage message = PeerToPeerMessage::makeRelayTruncated(3840, 4352);
 
-    verifyWritePayload(message, QByteArray::fromHex("03000016f704001100000000"));
+    verifyWritePayload(message, QByteArray::fromHex("030F0004000000001100"));
 
     // backwards
-    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030000053904001100000000"));
+    PeerToPeerMessage out = verifyReadPayload(QByteArray::fromHex("030F0004000000001100"));
 
-    QCOMPARE(out.tunnelId, (quint32)1337);
+    QCOMPARE(out.circuitId, (quint16)3840);
     QCOMPARE(out.celltype, PeerToPeerMessage::ENCRYPTED);
     QCOMPARE(out.command, PeerToPeerMessage::RELAY_TRUNCATED);
-    QCOMPARE(out.streamId, (quint16)17);
-    QVERIFY(out.isValidDigest());
+    QCOMPARE(out.streamId, (quint16)4352);
 }
 
 void PeerToPeerMessageTester::verifyWritePayload(PeerToPeerMessage message, QByteArray expectedPayload)
 {
     int size = expectedPayload.size();
-    QByteArray arr;
-    QDataStream stream(&arr, QIODevice::ReadWrite);
-    stream.setByteOrder(QDataStream::BigEndian);
-    stream << message;
+    QByteArray arr = message.toBytes();
 
     QByteArray payload = arr.left(size);
     QByteArray padding = arr.mid(size);
@@ -207,17 +159,16 @@ void PeerToPeerMessageTester::verifyWritePayload(PeerToPeerMessage message, QByt
     for(int i = 0; i < padding.size(); i++) {
         QCOMPARE(padding.at(i), '?');
     }
-
 }
 
 PeerToPeerMessage PeerToPeerMessageTester::verifyReadPayload(QByteArray payload)
 {
     payload.append(QByteArray(MESSAGE_LENGTH - payload.size(), '?')); // pad
-    QDataStream stream(payload);
-    PeerToPeerMessage out;
-    parseMessage(stream, out);
+    PeerToPeerMessage out = PeerToPeerMessage::fromBytes(payload);
 
-    QTest::qVerify(stream.atEnd(), "stream.atEnd()", "Stream did not consume full packet", __FILE__, __LINE__);
-
+    QTest::qVerify(!out.malformed, "!out.malformed", "Malformed message parsed", __FILE__, __LINE__);
+    if(out.celltype == PeerToPeerMessage::ENCRYPTED) {
+        QTest::qVerify(out.isValidDigest(), "out.isValidDigest()", "Encrypted message parsed", __FILE__, __LINE__);
+    }
     return out;
 }

@@ -133,7 +133,7 @@ PeerToPeerMessage PeerToPeerMessage::makeCommandCover(quint16 circId)
     PeerToPeerMessage msg;
     msg.celltype = PeerToPeerMessage::ENCRYPTED;
     msg.circuitId = circId;
-    msg.command = PeerToPeerMessage::CMD_DESTROY;
+    msg.command = PeerToPeerMessage::CMD_COVER;
     msg.streamId = 0;
     msg.calculateDigest();
     return msg;
@@ -366,7 +366,7 @@ QNetworkDatagram PeerToPeerMessage::toDatagram(Binding target) const
 
 QByteArray PeerToPeerMessage::pad(QByteArray packet, int length)
 {
-    QByteArray padding('?', length - packet.size());
+    QByteArray padding(length - packet.size(), '?');
     padding.prepend(packet);
     return padding;
 }

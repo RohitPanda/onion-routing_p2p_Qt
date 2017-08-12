@@ -21,7 +21,7 @@
 // created message:   | 02 | circ_id (2B) | handshake_len (2B) | handshake
 // encrypted message: | 03 | circ_id (2B) | <payload>
 //
-// payload:   | streamId (2B) | celltype (1B) | <command payload>
+// payload:  | celltype (1B) | digest (4B) | streamId (2B) | <command payload>
 // celltype can be CMD_DESTROY, RELAY_DATA, RELAY_EXTEND, RELAY_EXTENDED, RELAY_TRUNCATED
 //
 // command payload:
