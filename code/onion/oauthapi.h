@@ -33,7 +33,7 @@ signals:
 public slots:
     void requestAuthSessionStart(Binding peer, QByteArray key);
     void requestAuthSessionIncomingHS1(QByteArray hsp1);
-    void requestAuthSessionIncomingHS2(QByteArray hsp2);
+    void requestAuthSessionIncomingHS2(Binding peer, QByteArray hsp2);
     void requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload);
     void requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload);
     void requestAuthCipherEncrypt(Binding peer, QByteArray payload, payloadType type);
@@ -52,6 +52,7 @@ private slots:
 private:
     void maybeReconnect();
     void onData();
+    quint32 getRequestID();
 
     quint16 getSessionId(Binding Peer);
 
@@ -62,8 +63,10 @@ private:
         Binding peer;
         QByteArray key;
         quint16 sessionId;
-        quint16 last_requestId;
+        quint32 last_requestId;
     };
+
+    quint32 requestID =0;
 
     bool running_ = false;
 

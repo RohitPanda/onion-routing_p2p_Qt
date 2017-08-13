@@ -89,19 +89,9 @@ bool Controller::start()
         return false;
     }
 
-    if(oAuthApi_.start()) {
-        qDebug() << "oAuth api running on" << settings_.authApiAddress().toString();
-    } else {
-        qDebug() << "could not connect to oAuth api";
-        return false;
-    }
+    oAuthApi_.start();
 
-    if(rpsApi_.start()) {
-        qDebug() << "rps api running on" << settings_.rpsApiAddress().toString();
-    } else {
-        qDebug() << "could not connect to rps api";
-        return false;
-    }
+    rpsApi_.start();
 
     return true;
 }
