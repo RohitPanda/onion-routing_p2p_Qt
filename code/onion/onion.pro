@@ -22,7 +22,8 @@ SOURCES += \
     sessionkeystore.cpp \
     tunnelidmapper.cpp \
     oauthapi.cpp \
-    peersampler.cpp
+    peersampler.cpp \
+    tests/oauthapitester.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -48,7 +49,8 @@ HEADERS += \
     sessionkeystore.h \
     tunnelidmapper.h \
     oauthapi.h \
-    peersampler.h
+    peersampler.h \
+    tests/oauthapitester.h
 
 test{
 #    message(Configuring test build...)

@@ -58,6 +58,10 @@ signals:
     void requestEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
     void requestDecrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
 
+    void requestLayeredEncrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
+    void requestLayeredDecrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
+
+
     void requestStartSession(quint32 requestId, QByteArray hostkey);
     void sessionIncomingHS1(quint32 requestId, QByteArray handshake);
     void sessionIncomingHS2(quint32 requestId, quint16 sessionId, QByteArray handshake);

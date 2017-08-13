@@ -37,38 +37,38 @@ void OAuthApi::start()
     socket_.connectToHost(host_, port_);
 }
 
-void OAuthApi::requestAuthSessionStart(Binding peer, QByteArray key)
+void OAuthApi::requestAuthSessionStart(quint32 requestId, QByteArray hostkey)
 {
-    quint16 messageLength = 4 + 4 + 4 + key.length();
+    quint16 messageLength = 4 + 4 + 4 + hostkey.length();
 
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
-    quint32 requestId = OAuthApi::getRequestID();
+    //quint32 requestId = OAuthApi::getRequestID();
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_SESSION_START;
     stream << (quint32)0;
     stream << requestId;
-    message.append(key);
+    message.append(hostkey);
 
     if(!socket_.write(message)) {
         qDebug() << "Failed to write AUTH_SESSION_START:" << socket_.errorString();
     }
 }
 
-void OAuthApi::requestAuthSessionIncomingHS1(QByteArray hsp1)
+void OAuthApi::requestAuthSessionIncomingHS1(quint32 requestId, QByteArray handshake)
 {
-    quint16 messageLength = 4 + 4 + 4 + hsp1.length();
+    quint16 messageLength = 4 + 4 + 4 + handshake.length();
 
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
-    quint32 requestId = OAuthApi::getRequestID();
+    //quint32 requestId = OAuthApi::getRequestID();
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_SESSION_INCOMING_HS1;
     stream << (quint32)0;
     stream << requestId;
-    message.append(hsp1);
+    message.append(handshake);
 
     if(!socket_.write(message)) {
         qDebug() << "Failed to write AUTH_SESSION_INCOMING_HS1:" << socket_.errorString();
@@ -76,23 +76,23 @@ void OAuthApi::requestAuthSessionIncomingHS1(QByteArray hsp1)
 
 }
 
-void OAuthApi::requestAuthSessionIncomingHS2(Binding peer, QByteArray hsp2)
+void OAuthApi::requestAuthSessionIncomingHS2(quint32 requestId, quint16 sessionId, QByteArray handshake)
 {
-    quint16 messageLength = 4 + 4 + 4 + hsp2.length();
+    quint16 messageLength = 4 + 4 + 4 + handshake.length();
 
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 requestId = OAuthApi::getRequestID();
-    quint16 sessionId = OAuthApi::getSessionId(peer);
+    //quint32 requestId = OAuthApi::getRequestID();
+    //quint16 sessionId = OAuthApi::getSessionId(peer);
 
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_SESSION_INCOMING_HS2;
     stream << (quint16)0;
     stream << sessionId;
     stream << requestId;
-    message.append(hsp2);
+    message.append(handshake);
 
     if(!socket_.write(message)) {
         qDebug() << "Failed to write AUTH_SESSION_INCOMING_HS2:" << socket_.errorString();
@@ -100,16 +100,16 @@ void OAuthApi::requestAuthSessionIncomingHS2(Binding peer, QByteArray hsp2)
 
 }
 
-void OAuthApi::requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload)
+void OAuthApi::requestAuthLayerEncrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray cleartextPayload)
 {
-    quint8 noLayers = peers.size();
+    quint8 noLayers = sessionIds.size();
     quint16 messageLength = 4 + 4 + 4 + 2*noLayers + cleartextPayload.length();
 
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 requestId = OAuthApi::getRequestID();
+    //quint32 requestId = OAuthApi::getRequestID();
 
 
     stream << messageLength;
@@ -118,12 +118,10 @@ void OAuthApi::requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleart
     stream << noLayers;
     stream << (quint8)0;
     stream << requestId;
-    for(QVector<Binding>::iterator it = peers.begin(); it != peers.end(); it++)
+    for(QVector<quint16>::iterator it = sessionIds.begin(); it != sessionIds.end(); it++)
     {
-        quint16 sessionId = OAuthApi::getSessionId(*it);
-        stream << sessionId;
+        stream << *it;
     }
-
     message.append(cleartextPayload);
 
     if(!socket_.write(message)) {
@@ -132,16 +130,16 @@ void OAuthApi::requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleart
 
 }
 
-void OAuthApi::requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload)
+void OAuthApi::requestAuthLayerDecrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray encryptedPayload)
 {
-    quint8 noLayers = peers.size();
+    quint8 noLayers = sessionIds.size();
     quint16 messageLength = 4 + 4 + 4 + 2*noLayers + encryptedPayload.length();
 
     QByteArray message;
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 requestId = OAuthApi::getRequestID();
+    //quint32 requestId = OAuthApi::getRequestID();
 
 
     stream << messageLength;
@@ -150,10 +148,9 @@ void OAuthApi::requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryp
     stream << noLayers;
     stream << (quint8)0;
     stream << requestId;
-    for(QVector<Binding>::iterator it = peers.begin(); it != peers.end(); it++)
+    for(QVector<quint16>::iterator it = sessionIds.begin(); it != sessionIds.end(); it++)
     {
-        quint16 sessionId = OAuthApi::getSessionId(*it);
-        stream << sessionId;
+        stream << *it;
     }
 
     message.append(encryptedPayload);
@@ -163,7 +160,7 @@ void OAuthApi::requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryp
     }
 }
 
-void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, OAuthApi::payloadType type)
+void OAuthApi::requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload)
 {
     quint16 messageLength = 4 + 4 + 4 + 2 + payload.length();
 
@@ -171,8 +168,8 @@ void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, OAuthA
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 requestId = OAuthApi::getRequestID();
-    quint16 sessionId = OAuthApi::getSessionId(peer);
+    //quint32 requestId = OAuthApi::getRequestID();
+    //quint16 sessionId = OAuthApi::getSessionId(peer);
 
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_CIPHER_ENCRYPT;
@@ -186,7 +183,7 @@ void OAuthApi::requestAuthCipherEncrypt(Binding peer, QByteArray payload, OAuthA
     }
 }
 
-void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, OAuthApi::payloadType type)
+void OAuthApi::requestAuthCipherDecrypt(quint32 requestId, quint16 sessionId, QByteArray payload)
 {
     quint16 messageLength = 4 + 4 + 4 + 2 + payload.length();
 
@@ -194,8 +191,8 @@ void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, OAuthA
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 requestId = OAuthApi::getRequestID();
-    quint16 sessionId = OAuthApi::getSessionId(peer);
+    //quint32 requestId = OAuthApi::getRequestID();
+    //quint16 sessionId = OAuthApi::getSessionId(peer);
 
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_CIPHER_DECRYPT;
@@ -212,7 +209,7 @@ void OAuthApi::requestAuthCipherDecrypt(Binding peer, QByteArray payload, OAuthA
 
 
 
-void OAuthApi::requestAuthSessionClose(Binding peer)
+void OAuthApi::requestAuthSessionClose(quint16 sessionId)
 {
     quint16 messageLength = 4 + 4;
 
@@ -220,7 +217,7 @@ void OAuthApi::requestAuthSessionClose(Binding peer)
     QDataStream stream(&message, QIODevice::ReadWrite);
     stream.setByteOrder(QDataStream::BigEndian);
 
-    quint32 sessionId = OAuthApi::getSessionId(peer);
+    //quint32 sessionId = OAuthApi::getSessionId(peer);
 
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_SESSION_CLOSE;
@@ -251,7 +248,7 @@ void OAuthApi::readAuthSessionHS1(QByteArray message)
     {
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvSessionHS1(requestId, sessionId, payload);
     }
 
 }
@@ -274,7 +271,7 @@ void OAuthApi::readAuthSessionHS2(QByteArray message)
     {
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvSessionHS2(requestId, sessionId, payload);
     }
 
 }
@@ -291,9 +288,11 @@ void OAuthApi::readAuthLayerEncryptResp(QByteArray message)
 
     if(checkRequestId(requestId))
     {
+        quint16 sessionId;
+        sessionId = OAuthApi::getSessionId(requestId);
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvEncrypted(requestId, sessionId, payload);
     }
 }
 
@@ -311,7 +310,7 @@ void OAuthApi::readAuthLayerDecryptResp(QByteArray message)
     {
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvDecrypted(requestId, payload);
     }
 }
 
@@ -327,9 +326,11 @@ void OAuthApi::readAuthCipherEncryptResp(QByteArray message)
 
     if(checkRequestId(requestId))
     {
+        quint16 sessionId;
+        sessionId = OAuthApi::getSessionId(requestId);
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvEncrypted(requestId, sessionId, payload);
     }
 }
 
@@ -347,7 +348,7 @@ void OAuthApi::readAuthCipherDecryptResp(QByteArray message)
     {
         QByteArray payload;
         stream >> payload;
-        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+        emit recvDecrypted(requestId, payload);
     }
 }
 
@@ -460,9 +461,25 @@ quint16 OAuthApi::getSessionId(Binding Peer)
     return 0;
 }
 
+quint16 OAuthApi::getSessionId(quint32 requestId)
+{
+    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
+    {
+        if(it->last_requestId == requestId)
+            return it->sessionId;
+    }
+    return 0;
+}
+
 bool OAuthApi::checkRequestId(quint32 requestId)
 {
-    return true;
+    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
+    {
+        if(it->last_requestId == requestId)
+            return true;
+    }
+
+    return false;
 }
 
 bool OAuthApi::checkRequestId(quint16 sessionId, quint32 requestId)
@@ -472,6 +489,8 @@ bool OAuthApi::checkRequestId(quint16 sessionId, quint32 requestId)
         if(it->sessionId == sessionId)
             return (it->last_requestId == requestId);
     }
+
+    return false;
 }
 
 void OAuthApi::maybeReconnect()

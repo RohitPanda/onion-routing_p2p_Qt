@@ -54,7 +54,19 @@ bool Controller::start()
     connect(&p2p_, &PeerToPeer::tunnelError, &onionApi_, &OnionApi::sendTunnelError);
 
     // connect to oauth api
-    // TODO
+    connect(&oAuthApi_, &OAuthApi::recvSessionHS1, &p2p_, &PeerToPeer::onSessionHS1);
+    connect(&oAuthApi_, &OAuthApi::recvSessionHS2, &p2p_, &PeerToPeer::onSessionHS2);
+    connect(&oAuthApi_, &OAuthApi::recvEncrypted, &p2p_, &PeerToPeer::onEncrypted);
+    connect(&oAuthApi_, &OAuthApi::recvDecrypted, &p2p_, &PeerToPeer::onDecrypted);
+
+    connect(&p2p_, &PeerToPeer::requestEncrypt, &oAuthApi_, &OAuthApi::requestAuthCipherEncrypt);
+    connect(&p2p_, &PeerToPeer::requestDecrypt, &oAuthApi_, &OAuthApi::requestAuthCipherDecrypt);
+    connect(&p2p_, &PeerToPeer::requestStartSession, &oAuthApi_, &OAuthApi::requestAuthSessionStart);
+    connect(&p2p_, &PeerToPeer::sessionIncomingHS1, &oAuthApi_, &OAuthApi::requestAuthSessionIncomingHS1);
+    connect(&p2p_, &PeerToPeer::sessionIncomingHS2, &oAuthApi_, &OAuthApi::requestAuthSessionIncomingHS2);
+    connect(&p2p_, &PeerToPeer::requestEndSession, &oAuthApi_, &OAuthApi::requestAuthSessionClose);
+    connect(&p2p_, &PeerToPeer::requestLayeredEncrypt, &oAuthApi_, &OAuthApi::requestAuthLayerEncrypt);
+    connect(&p2p_, &PeerToPeer::requestLayeredDecrypt, &oAuthApi_, &OAuthApi::requestAuthLayerDecrypt);
 
 
 //    bool debugOnion = true;

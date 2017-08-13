@@ -4,6 +4,7 @@
 #include "binding.h"
 #include "messagetypes.h"
 #include "metatypes.h"
+#include "peertopeer.h"
 
 #include <QObject>
 #include <QTcpServer>
@@ -21,24 +22,36 @@ public:
 
     void start();
 
-    enum payloadType
-    {
-        PLAINTEXT = 0,
-        ENCRYPTED = 1
-    };
+//    enum payloadType
+//    {
+//        PLAINTEXT = 0,
+//        ENCRYPTED = 1
+//    };
 
 signals:
-    void payloadFromAuthApi(QByteArray payload, payloadType type);
+    void recvEncrypted(quint32 requestId, quint16 sessionId, QByteArray payload);
+    void recvDecrypted(quint32 requestId, QByteArray payload);
+    void recvSessionHS1(quint32 requestId, quint16 sessionId, QByteArray handshake);
+    void recvSessionHS2(quint32 requestId, quint16 sessionId, QByteArray handshake);
 
 public slots:
-    void requestAuthSessionStart(Binding peer, QByteArray key);
-    void requestAuthSessionIncomingHS1(QByteArray hsp1);
-    void requestAuthSessionIncomingHS2(Binding peer, QByteArray hsp2);
-    void requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload);
-    void requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload);
-    void requestAuthCipherEncrypt(Binding peer, QByteArray payload, payloadType type);
-    void requestAuthCipherDecrypt(Binding peer, QByteArray payload, payloadType type);
-    void requestAuthSessionClose(Binding peer);
+//    void requestAuthSessionStart(Binding peer, QByteArray key);
+//    void requestAuthSessionIncomingHS1(QByteArray hsp1);
+//    void requestAuthSessionIncomingHS2(Binding peer, QByteArray hsp2);
+//    void requestAuthLayerEncrypt(QVector<Binding> peers, QByteArray cleartextPayload);
+//    void requestAuthLayerDecrypt(QVector<Binding> peers, QByteArray encryptedPayload);
+//    void requestAuthCipherEncrypt(Binding peer, QByteArray payload, payloadType type);
+//    void requestAuthCipherDecrypt(Binding peer, QByteArray payload, payloadType type);
+//    void requestAuthSessionClose(Binding peer);
+
+    void requestAuthSessionStart(quint32 requestId, QByteArray hostkey);
+    void requestAuthSessionIncomingHS1(quint32 requestId, QByteArray handshake);
+    void requestAuthSessionIncomingHS2(quint32 requestId, quint16 sessionId, QByteArray handshake);
+    void requestAuthLayerEncrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
+    void requestAuthLayerDecrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
+    void requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
+    void requestAuthCipherDecrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
+    void requestAuthSessionClose(quint16 sessionId);
 
 private slots:
     void readAuthSessionHS1(QByteArray message);
@@ -55,6 +68,8 @@ private:
     quint32 getRequestID();
 
     quint16 getSessionId(Binding Peer);
+
+    quint16 getSessionId(quint32 requestId);
 
     bool checkRequestId(quint16 sessionId, quint32 requestId);
 
