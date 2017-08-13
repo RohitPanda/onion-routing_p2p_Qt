@@ -23,7 +23,7 @@ int PeerSampler::requestPeers(int n)
 
 void PeerSampler::setRpsApi(RPSApi *api)
 {
-    connect(api, &RPSApi::onPeer, this, PeerSampler::onPeer);
+    connect(api, &RPSApi::onPeer, this, &PeerSampler::onPeer);
     connect(this, &PeerSampler::requestPeer, api, &RPSApi::requestPeer);
 }
 
