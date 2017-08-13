@@ -29,7 +29,7 @@ bool Controller::start()
     rpsApi_.setHost(settings_.rpsApiAddress().address, settings_.rpsApiAddress().port);
 
     // setup oauth api
-    // TODO
+    oAuthApi_.setHost(settings_.authApiAddress().address, settings_.authApiAddress().port);
 
     // setup peersampler
     rpsApiProxy_.setRpsApi(&rpsApi_);
@@ -86,6 +86,20 @@ bool Controller::start()
         qDebug() << "p2p running on" << settings_.onionApiAddress().toString();
     } else {
         qDebug() << "could not start p2p";
+        return false;
+    }
+
+    if(oAuthApi_.start()) {
+        qDebug() << "oAuth api running on" << settings_.authApiAddress().toString();
+    } else {
+        qDebug() << "could not connect to oAuth api";
+        return false;
+    }
+
+    if(rpsApi_.start()) {
+        qDebug() << "rps api running on" << settings_.rpsApiAddress().toString();
+    } else {
+        qDebug() << "could not connect to rps api";
         return false;
     }
 
