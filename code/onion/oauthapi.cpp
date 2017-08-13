@@ -233,39 +233,142 @@ void OAuthApi::requestAuthSessionClose(Binding peer)
 
 }
 
-void OAuthApi::readAuthSessionHS1()
+void OAuthApi::readAuthSessionHS1(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(6);
+
+    quint16 sessionId;
+    quint32 requestId;
+
+    stream >> sessionId;
+    stream >> requestId;
+
+
+
+    if(checkRequestId(sessionId, requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 
 }
 
-void OAuthApi::readAuthSessionHS2()
+void OAuthApi::readAuthSessionHS2(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(6);
+
+    quint16 sessionId;
+    quint32 requestId;
+
+    stream >> sessionId;
+    stream >> requestId;
+
+
+
+    if(checkRequestId(sessionId, requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 
 }
 
-void OAuthApi::readAuthLayerEncryptResp()
+void OAuthApi::readAuthLayerEncryptResp(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(8);
 
+    quint32 requestId;
+
+    stream >> requestId;
+
+    if(checkRequestId(requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 }
 
-void OAuthApi::readAuthLayerDecryptResp()
+void OAuthApi::readAuthLayerDecryptResp(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(8);
 
+    quint32 requestId;
+
+    stream >> requestId;
+
+    if(checkRequestId(requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 }
 
-void OAuthApi::readAuthCipherEncryptResp()
+void OAuthApi::readAuthCipherEncryptResp(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(8);
 
+    quint32 requestId;
+
+    stream >> requestId;
+
+    if(checkRequestId(requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 }
 
-void OAuthApi::readAuthCipherDecryptResp()
+void OAuthApi::readAuthCipherDecryptResp(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(8);
 
+    quint32 requestId;
+
+    stream >> requestId;
+
+    if(checkRequestId(requestId))
+    {
+        QByteArray payload;
+        stream >> payload;
+        emit payloadFromAuthApi(payload, OAuthApi::payloadType::PLAINTEXT);
+    }
 }
 
-void OAuthApi::readAuthError()
+void OAuthApi::readAuthError(QByteArray message)
 {
+    QDataStream stream(message);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.skipRawData(6);
 
+    quint16 sessionId;
+    quint32 requestId;
+
+    stream >> sessionId;
+    stream >> requestId;
+
+
+
+    if(checkRequestId(sessionId, requestId))
+    {
+
+    }
 }
 
 void OAuthApi::onData()
@@ -300,31 +403,31 @@ void OAuthApi::onData()
     switch (type) {
 
     case MessageType::AUTH_SESSION_HS1:
-        readAuthSessionHS1();
+        readAuthSessionHS1(message);
         break;
 
     case MessageType::AUTH_SESSION_INCOMING_HS2:
-        readAuthSessionHS2();
+        readAuthSessionHS2(message);
         break;
 
     case MessageType::AUTH_LAYER_ENCRYPT_RESP:
-        readAuthLayerEncryptResp();
+        readAuthLayerEncryptResp(message);
         break;
 
     case MessageType::AUTH_LAYER_DECRYPT_RESP:
-        readAuthLayerDecryptResp();
+        readAuthLayerDecryptResp(message);
         break;
 
     case MessageType::AUTH_CIPHER_ENCRYPT_RESP:
-        readAuthCipherEncryptResp();
+        readAuthCipherEncryptResp(message);
         break;
 
     case MessageType::AUTH_CIPHER_DECRYPT_RESP:
-        readAuthCipherDecryptResp();
+        readAuthCipherDecryptResp(message);
         break;
 
     case MessageType::AUTH_ERROR:
-        readAuthError();
+        readAuthError(message);
         qDebug() << "oauth-api: cannot command a onion signal-type ->" << messageTypeInt << "discarding message";
         break;
 
@@ -349,12 +452,26 @@ quint32 OAuthApi::getRequestID()
 
 quint16 OAuthApi::getSessionId(Binding Peer)
 {
+    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
+    {
+        if(it->peer == Peer)
+            return it->sessionId;
+    }
     return 0;
 }
 
-bool OAuthApi::checkRequestId(quint16 sessionId, quint16 requestId)
+bool OAuthApi::checkRequestId(quint32 requestId)
 {
     return true;
+}
+
+bool OAuthApi::checkRequestId(quint16 sessionId, quint32 requestId)
+{
+    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
+    {
+        if(it->sessionId == sessionId)
+            return (it->last_requestId == requestId);
+    }
 }
 
 void OAuthApi::maybeReconnect()

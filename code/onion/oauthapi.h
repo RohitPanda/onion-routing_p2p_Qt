@@ -41,13 +41,13 @@ public slots:
     void requestAuthSessionClose(Binding peer);
 
 private slots:
-    void readAuthSessionHS1();
-    void readAuthSessionHS2();
-    void readAuthLayerEncryptResp();
-    void readAuthLayerDecryptResp();
-    void readAuthCipherEncryptResp();
-    void readAuthCipherDecryptResp();
-    void readAuthError();
+    void readAuthSessionHS1(QByteArray message);
+    void readAuthSessionHS2(QByteArray message);
+    void readAuthLayerEncryptResp(QByteArray message);
+    void readAuthLayerDecryptResp(QByteArray message);
+    void readAuthCipherEncryptResp(QByteArray message);
+    void readAuthCipherDecryptResp(QByteArray message);
+    void readAuthError(QByteArray message);
 
 private:
     void maybeReconnect();
@@ -56,7 +56,9 @@ private:
 
     quint16 getSessionId(Binding Peer);
 
-    bool checkRequestId(quint16 sessionId, quint16 requestId);
+    bool checkRequestId(quint16 sessionId, quint32 requestId);
+
+    bool checkRequestId(quint32 requestId);
 
     struct Hop
     {
