@@ -247,7 +247,7 @@ void OAuthApi::readAuthSessionHS1(QByteArray message)
     if(checkRequestId(sessionId, requestId))
     {
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvSessionHS1(requestId, sessionId, payload);
     }
 
@@ -270,7 +270,7 @@ void OAuthApi::readAuthSessionHS2(QByteArray message)
     if(checkRequestId(sessionId, requestId))
     {
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvSessionHS2(requestId, sessionId, payload);
     }
 
@@ -291,7 +291,7 @@ void OAuthApi::readAuthLayerEncryptResp(QByteArray message)
         quint16 sessionId;
         sessionId = OAuthApi::getSessionId(requestId);
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvEncrypted(requestId, sessionId, payload);
     }
 }
@@ -309,7 +309,7 @@ void OAuthApi::readAuthLayerDecryptResp(QByteArray message)
     if(checkRequestId(requestId))
     {
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvDecrypted(requestId, payload);
     }
 }
@@ -329,7 +329,7 @@ void OAuthApi::readAuthCipherEncryptResp(QByteArray message)
         quint16 sessionId;
         sessionId = OAuthApi::getSessionId(requestId);
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvEncrypted(requestId, sessionId, payload);
     }
 }
@@ -347,7 +347,7 @@ void OAuthApi::readAuthCipherDecryptResp(QByteArray message)
     if(checkRequestId(requestId))
     {
         QByteArray payload;
-        stream >> payload;
+        payload = message.mid(12);
         emit recvDecrypted(requestId, payload);
     }
 }
@@ -473,13 +473,14 @@ quint16 OAuthApi::getSessionId(quint32 requestId)
 
 bool OAuthApi::checkRequestId(quint32 requestId)
 {
-    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
-    {
-        if(it->last_requestId == requestId)
-            return true;
-    }
+//    for(QVector<Hop>::iterator it = OAuthApi::Hops.begin(); it != OAuthApi::Hops.end(); it++)
+//    {
+//        if(it->last_requestId == requestId)
+//            return true;
+//    }
 
-    return false;
+    //return false;
+    return true;
 }
 
 bool OAuthApi::checkRequestId(quint16 sessionId, quint32 requestId)

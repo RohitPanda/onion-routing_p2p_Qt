@@ -1,6 +1,7 @@
 #include "tests/onionapitester.h"
 #include "tests/rpsapitester.h"
 #include "tests/peertopeermessagetester.h"
+#include "tests/oauthapitester.h"
 #include <QTest>
 #include <QCoreApplication>
 
@@ -12,9 +13,10 @@ int main(int argc, char *argv[])
     qRegisterMetaType<QHostAddress>();
 
     auto tests = QList<QObject*>({
-         new OnionApiTester(),
-         new RPSApiTester(),
-         new PeerToPeerMessageTester()
+         //new OnionApiTester(),
+         //new RPSApiTester(),
+         //new PeerToPeerMessageTester(),
+         new OAuthApiTester()
     });
 
     bool ok = true;
