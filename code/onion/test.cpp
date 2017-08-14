@@ -13,9 +13,9 @@ int main(int argc, char *argv[])
     qRegisterMetaType<QHostAddress>();
 
     auto tests = QList<QObject*>({
-         //new OnionApiTester(),
-         //new RPSApiTester(),
-         //new PeerToPeerMessageTester(),
+         new OnionApiTester(),
+         new RPSApiTester(),
+         new PeerToPeerMessageTester(),
          new OAuthApiTester()
     });
 

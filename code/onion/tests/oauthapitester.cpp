@@ -55,27 +55,142 @@ void OAuthApiTester::testSessionStart()
 
 void OAuthApiTester::testEncrypt()
 {
+    bool hadData = false;
+    std::function<void(QByteArray)> onData = [&](QByteArray data) {
+        QByteArray expected = QByteArray::fromHex("001A026300000000000000170075656e63727970742074686973");
+        QCOMPARE(data, expected);
+        hadData = true;
+    };
+
+    auto server = tcpServer(QHostAddress::LocalHost, 5128, onData, nullptr);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5128);
+    api.start();
+
+    QSignalSpy spy(server, &QTcpServer::newConnection);
+    spy.wait(1000);
+
+    api.requestAuthCipherEncrypt(23, 117, QByteArray("encrypt this"));
+
+
+    QTest::qWait(500);
+    QVERIFY(hadData);
+
+    delete server;
 
 }
 
 void OAuthApiTester::testDecrypt()
 {
+    bool hadData = false;
+    std::function<void(QByteArray)> onData = [&](QByteArray data) {
+        QByteArray expected = QByteArray::fromHex("001A026500000000000000170075646563727970742074686973");
+        QCOMPARE(data, expected);
+        hadData = true;
+    };
 
+    auto server = tcpServer(QHostAddress::LocalHost, 5129, onData, nullptr);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5129);
+    api.start();
+
+    QSignalSpy spy(server, &QTcpServer::newConnection);
+    spy.wait(1000);
+
+    api.requestAuthCipherDecrypt(23, 117, QByteArray("decrypt this"));
+
+
+    QTest::qWait(500);
+    QVERIFY(hadData);
+
+    delete server;
 }
 
 void OAuthApiTester::testLayeredEncrypt()
 {
+    bool hadData = false;
+    std::function<void(QByteArray)> onData = [&](QByteArray data) {
+        QByteArray expected = QByteArray::fromHex("001A025D00000100000000170075656e63727970742074686973");
+        QCOMPARE(data, expected);
+        hadData = true;
+    };
+
+    auto server = tcpServer(QHostAddress::LocalHost, 5130, onData, nullptr);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5130);
+    api.start();
+
+    QSignalSpy spy(server, &QTcpServer::newConnection);
+    spy.wait(1000);
+    QVector<quint16> sessionIds = {117};
+
+    api.requestAuthLayerEncrypt(23, sessionIds, QByteArray("encrypt this"));
+
+
+    QTest::qWait(500);
+    QVERIFY(hadData);
+
+    delete server;
 
 }
 
 void OAuthApiTester::testLayeredDecrypt()
 {
+    bool hadData = false;
+    std::function<void(QByteArray)> onData = [&](QByteArray data) {
+        QByteArray expected = QByteArray::fromHex("001A025E00000100000000170075646563727970742074686973");
+        QCOMPARE(data, expected);
+        hadData = true;
+    };
 
+    auto server = tcpServer(QHostAddress::LocalHost, 5131, onData, nullptr);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5131);
+    api.start();
+
+    QSignalSpy spy(server, &QTcpServer::newConnection);
+    spy.wait(1000);
+
+    QVector<quint16> sessionIds = {117};
+
+    api.requestAuthLayerDecrypt(23, sessionIds, QByteArray("decrypt this"));
+
+
+    QTest::qWait(500);
+    QVERIFY(hadData);
+
+    delete server;
 }
 
 void OAuthApiTester::testSessionClose()
 {
+    bool hadData = false;
+    std::function<void(QByteArray)> onData = [&](QByteArray data) {
+        QByteArray expected = QByteArray::fromHex("000802610000007B");
+        QCOMPARE(data, expected);
+        hadData = true;
+    };
 
+    auto server = tcpServer(QHostAddress::LocalHost, 5136, onData, nullptr);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5136);
+    api.start();
+
+    QSignalSpy spy(server, &QTcpServer::newConnection);
+    spy.wait(1000);
+
+    api.requestAuthSessionClose(123);
+
+
+    QTest::qWait(500);
+    QVERIFY(hadData);
+
+    delete server;
 }
 
 void OAuthApiTester::testEncryptResp()
@@ -85,10 +200,10 @@ void OAuthApiTester::testEncryptResp()
         socket->write(peer);
     };
 
-    auto server = tcpServer(QHostAddress::LocalHost, 5127, nullptr, onConnection);
+    auto server = tcpServer(QHostAddress::LocalHost, 5132, nullptr, onConnection);
 
     OAuthApi api;
-    api.setHost(QHostAddress::LocalHost, 5127);
+    api.setHost(QHostAddress::LocalHost, 5132);
 
     // wait for connection
     QSignalSpy spy(&api, &OAuthApi::recvEncrypted);
@@ -109,16 +224,88 @@ void OAuthApiTester::testEncryptResp()
 
 void OAuthApiTester::testDecryptResp()
 {
+    std::function<void(QTcpSocket *)> onConnection = [=](QTcpSocket *socket) {
+        QByteArray peer = QByteArray::fromHex("00160260000000000000001700000000000000000001");
+        socket->write(peer);
+    };
+
+    auto server = tcpServer(QHostAddress::LocalHost, 5133, nullptr, onConnection);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5133);
+
+    // wait for connection
+    QSignalSpy spy(&api, &OAuthApi::recvDecrypted);
+
+    api.start();
+
+    spy.wait(2000);
+    QCOMPARE(spy.count(), 1);
+
+    auto params = spy.takeFirst();
+
+    QCOMPARE(params[0].toInt(), 23);
+    QCOMPARE(params[1].value<QByteArray>(), QByteArray::fromHex("00000000000000000001"));
+
+    delete server;
 
 }
 
 void OAuthApiTester::testLayeredEncryptResp()
 {
+    std::function<void(QTcpSocket *)> onConnection = [=](QTcpSocket *socket) {
+        QByteArray peer = QByteArray::fromHex("0016025F000000000000001700000000000000000001");
+        socket->write(peer);
+    };
 
+    auto server = tcpServer(QHostAddress::LocalHost, 5134, nullptr, onConnection);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5134);
+
+    // wait for connection
+    QSignalSpy spy(&api, &OAuthApi::recvEncrypted);
+
+    api.start();
+
+    spy.wait(2000);
+    QCOMPARE(spy.count(), 1);
+
+    auto params = spy.takeFirst();
+
+    QCOMPARE(params[0].toInt(), 23);
+    //QCOMPARE(params[1].toInt(), );
+    QCOMPARE(params[2].value<QByteArray>(), QByteArray::fromHex("00000000000000000001"));
+
+    delete server;
 }
 
 void OAuthApiTester::testLayeredDecryptResp()
 {
+    std::function<void(QTcpSocket *)> onConnection = [=](QTcpSocket *socket) {
+        QByteArray peer = QByteArray::fromHex("00160260000000000000001700000000000000000001");
+        socket->write(peer);
+    };
+
+    auto server = tcpServer(QHostAddress::LocalHost, 5135, nullptr, onConnection);
+
+    OAuthApi api;
+    api.setHost(QHostAddress::LocalHost, 5135);
+
+    // wait for connection
+    QSignalSpy spy(&api, &OAuthApi::recvDecrypted);
+
+    api.start();
+
+    spy.wait(2000);
+    QCOMPARE(spy.count(), 1);
+
+    auto params = spy.takeFirst();
+
+    QCOMPARE(params[0].toInt(), 23);
+    QCOMPARE(params[1].value<QByteArray>(), QByteArray::fromHex("00000000000000000001"));
+
+    delete server;
 
 }
 
