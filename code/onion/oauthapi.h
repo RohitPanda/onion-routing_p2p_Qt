@@ -50,6 +50,7 @@ public slots:
     void requestAuthLayerEncrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
     void requestAuthLayerDecrypt(quint32 requestId, QVector<quint16> sessionIds, QByteArray payload);
     void requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
+    //void requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload, quint32 flag);
     void requestAuthCipherDecrypt(quint32 requestId, quint16 sessionId, QByteArray payload);
     void requestAuthSessionClose(quint16 sessionId);
 

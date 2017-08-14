@@ -57,7 +57,7 @@ void OAuthApiTester::testEncrypt()
 {
     bool hadData = false;
     std::function<void(QByteArray)> onData = [&](QByteArray data) {
-        QByteArray expected = QByteArray::fromHex("001A026300000000000000170075656e63727970742074686973");
+        QByteArray expected = QByteArray::fromHex("001A026300000001000000170075656e63727970742074686973");
         QCOMPARE(data, expected);
         hadData = true;
     };
@@ -72,7 +72,7 @@ void OAuthApiTester::testEncrypt()
     spy.wait(1000);
 
     api.requestAuthCipherEncrypt(23, 117, QByteArray("encrypt this"));
-
+    //api.requestAuthCipherEncrypt(23, 117, QByteArray("encrypt this"), 1);
 
     QTest::qWait(500);
     QVERIFY(hadData);

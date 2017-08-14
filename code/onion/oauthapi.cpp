@@ -160,6 +160,7 @@ void OAuthApi::requestAuthLayerDecrypt(quint32 requestId, QVector<quint16> sessi
     }
 }
 
+//void OAuthApi::requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload, quint32 flag)
 void OAuthApi::requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QByteArray payload)
 {
     quint16 messageLength = 4 + 4 + 4 + 2 + payload.length();
@@ -170,13 +171,15 @@ void OAuthApi::requestAuthCipherEncrypt(quint32 requestId, quint16 sessionId, QB
 
     //quint32 requestId = OAuthApi::getRequestID();
     //quint16 sessionId = OAuthApi::getSessionId(peer);
+    quint32 flag = 0;
 
     stream << messageLength;
     stream << (quint16)MessageType::AUTH_CIPHER_ENCRYPT;
-    stream << (quint32)0;
+    stream << flag;
     stream << requestId;
     stream << sessionId;
     message.append(payload);
+
 
     if(!socket_.write(message)) {
         qDebug() << "Failed to write AUTH_CIPHER_ENCRYPT:" << socket_.errorString();
@@ -480,7 +483,10 @@ bool OAuthApi::checkRequestId(quint32 requestId)
 //    }
 
     //return false;
-    return true;
+    if(requestId > 0)
+        return true;
+    else
+        return false;
 }
 
 bool OAuthApi::checkRequestId(quint16 sessionId, quint32 requestId)
