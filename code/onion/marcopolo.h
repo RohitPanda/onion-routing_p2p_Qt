@@ -37,6 +37,8 @@ private:
     Binding peer_;
     bool polo_ = false;
 
+    int polos_ = 0;
+
     quint32 poloTunnelId = 0;
 };
 

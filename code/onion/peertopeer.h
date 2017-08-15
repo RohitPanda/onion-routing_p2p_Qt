@@ -173,7 +173,7 @@ private slots:
     void sendPeerToPeerMessage(PeerToPeerMessage unencrypted, Binding target);
     void sendPeerToPeerMessage(PeerToPeerMessage unencrypted, QVector<HopState> tunnel);
 
-    void tearCircuit(quint32 tunnelId); // sends destroy messages along the circuit
+    void tearCircuit(quint32 tunnelId, bool clean); // sends destroy messages along the circuit
     void cleanCircuit(quint32 tunnelId); // cleans up resources
 
     void peersArrived(int id, QList<PeerSampler::Peer> peers);

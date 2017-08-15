@@ -51,8 +51,14 @@ void MarcoPolo::onTunnelData(quint32 tunnelId, QByteArray data)
         }
     } else if(data == "POLO") {
         qDebug() << "polo on " << tunnelId;
+        polos_++;
         if(poloTunnelId != 0) {
-            marco();
+            if(polos_ > 100) {
+                qDebug() << "tearing tunnel round after 100 polos..";
+                requestDestroyTunnel(poloTunnelId);
+            } else {
+                marco();
+            }
         }
     }
 }

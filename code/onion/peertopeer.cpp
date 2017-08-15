@@ -341,11 +341,9 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         // fix circuit state, to represent the truncated connection
         circuit.hopStates = circuit.hopStates.mid(0, lastPeerIndex + 1);
         // now tear the circuit
-        tearCircuit(circuitTunnelId);
+        tearCircuit(circuitTunnelId, true);
         // announce circuit failure to api
         tunnelError(circuit.circuitApiTunnelId, circuit.lastMessage);
-        // clean up circuit
-        cleanCircuit(circuitTunnelId);
     }
         break;
     case PeerToPeerMessage::CMD_DESTROY:
@@ -355,7 +353,7 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         if(state != nullptr) {
             // we cannot talk to nexthop directly, originator must send destroys to all hops
             // cleanup tunnel
-            requestEndSession(state->tunnelIdPreviousHop);
+            requestEndSession(sessions_.get(state->tunnelIdPreviousHop));
             sessions_.remove(state->tunnelIdPreviousHop);
             tunnels_.removeOne(*state);
         }
@@ -463,7 +461,7 @@ void PeerToPeer::sendPeerToPeerMessage(PeerToPeerMessage unencrypted, QVector<Pe
     continueLayeredEncrypt(request, msgPayload);
 }
 
-void PeerToPeer::tearCircuit(quint32 tunnelId)
+void PeerToPeer::tearCircuit(quint32 tunnelId, bool clean)
 {
     if(!circuits_.contains(tunnelId)) {
         return;
@@ -479,6 +477,12 @@ void PeerToPeer::tearCircuit(quint32 tunnelId)
             sendPeerToPeerMessage(message, hops);
         });
     }
+
+    if(clean) {
+        QTimer::singleShot(500 * (state.hopStates.size() + 1), [=]() {
+            cleanCircuit(tunnelId);
+        });
+    }
 }
 
 void PeerToPeer::cleanCircuit(quint32 tunnelId)
@@ -492,6 +496,7 @@ void PeerToPeer::cleanCircuit(quint32 tunnelId)
         if(hop.status == Created) {
             // clear auth sessions
             requestEndSession(hop.sessionKey);
+            sessions_.remove(hop.tunnelId);
         }
     }
 }
@@ -673,7 +678,7 @@ void PeerToPeer::destroyTunnel(quint32 tunnelId)
         CircuitState &state = it.value();
         if(state.circuitApiTunnelId == tunnelId) {
             state.lastMessage = MessageType::ONION_TUNNEL_DESTROY;
-            destroyTunnel(it.key());
+            tearCircuit(it.key(), true);
             return;
         }
     }
