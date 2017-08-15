@@ -58,6 +58,7 @@ bool Controller::start()
         p2pAddr.port = overridePort_;
     }
 
+    p2p_.setDebugLog(verbose_);
     p2p_.setInterface(p2pAddr.address);
     p2p_.setPort(p2pAddr.port);
     p2p_.setNHops(2);
@@ -163,6 +164,11 @@ void Controller::setMarcoPolo(Binding marco, bool polo)
 {
     marco_ = marco;
     polo_ = polo;
+}
+
+void Controller::setVerbose(bool v)
+{
+    verbose_ = v;
 }
 
 void Controller::setupMarcoPolo()

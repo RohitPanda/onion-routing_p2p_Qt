@@ -33,6 +33,8 @@ public:
 
     void setPeerSampler(PeerSampler *sampler);
     
+    void setDebugLog(bool debugLog);
+
 public slots:
     // from OnionApi
     void buildTunnel(QHostAddress destinationAddr, quint16 destinationPort, QByteArray hostkey, QTcpSocket *requestId);
@@ -216,6 +218,8 @@ private:
     int nHops_ = 2;
 
     PeerSampler *peerSampler_ = nullptr;
+
+    bool debugLog_ = false;
 };
 
 #endif // PEERTOPEER_H

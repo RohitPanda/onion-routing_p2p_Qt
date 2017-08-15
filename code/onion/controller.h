@@ -22,6 +22,7 @@ public:
     void setMockPeers(QList<Binding> peers);
     void setMockOauth(bool enable);
     void setMarcoPolo(Binding marco, bool polo);
+    void setVerbose(bool v);
 
 private:
     bool mockRPS() const { return !mockPeers_.isEmpty(); }
@@ -48,6 +49,7 @@ private:
     bool mockOAuth_ = false;
     Binding marco_;
     bool polo_ = false;
+    bool verbose_ = false;
 };
 
 #endif // CONTROLLER_H

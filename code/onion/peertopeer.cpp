@@ -38,7 +38,7 @@ bool PeerToPeer::start()
 
 void PeerToPeer::onDatagram()
 {
-    qDebug() << "onDatagram";
+//    qDebug() << "onDatagram";
     while (socket_.hasPendingDatagrams()) {
         handleDatagram(socket_.receiveDatagram());
     }
@@ -60,7 +60,9 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
 
     PeerToPeerMessage message = PeerToPeerMessage::fromDatagram(datagram);
     Binding peer = message.sender;
-    qDebug() << "P2P data from" << peer.toString() << message.typeString();
+    if(debugLog_) {
+        qDebug() << "P2P data from" << peer.toString() << message.typeString();
+    }
 
     if(message.malformed) {
         qDebug() << "P2P malformed message from" << peer.toString() << message.typeString()
@@ -185,7 +187,10 @@ void PeerToPeer::handleBuild(PeerToPeerMessage message)
 {
     // incoming tunnel
     // send handshake to auth to build us a session
-    qDebug() << "handleBuild";
+    if(debugLog_) {
+        qDebug() << "handleBuild, requesting session";
+    }
+
     quint32 reqId = nextAuthRequest_++;
     incomingTunnels_[reqId] = tunnelIds_.tunnelId(message.sender, message.circuitId);
     sessionIncomingHS1(reqId, message.data);
@@ -197,7 +202,6 @@ void PeerToPeer::handleCreated(PeerToPeerMessage message)
     // nexthop established
     // a) part of a circuit we initiated
     // b) part of an incomming tunnel, i.e. an earlier relay_extend
-    qDebug() << "handleCreated";
     quint32 nextHopTunnelId = tunnelIds_.tunnelId(message.sender, message.circuitId);
     if(pendingTunnelExtensions_.contains(nextHopTunnelId)) {
         // b)
@@ -237,6 +241,9 @@ void PeerToPeer::handleCreated(PeerToPeerMessage message)
     hop.status = Created;
     // continue circuit build
     continueBuildingTunnel(nextHopTunnelId);
+    if(debugLog_) {
+        qDebug() << "initial tunnel hop ready, extending...";
+    }
 }
 
 void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunnelId)
@@ -249,7 +256,9 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         return;
     }
 
-    qDebug() << "handleMessage ->" << message.typeString();
+    if(debugLog_) {
+        qDebug() << "handleMessage ->" << message.typeString();
+    }
 
     switch (message.command) {
     case PeerToPeerMessage::RELAY_DATA:
@@ -318,6 +327,10 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         // tear circuit if not from start node
         // clean up circuit
     {
+        if(debugLog_) {
+            qDebug() << "truncated circuit, reporting & cleaning up";
+        }
+
         // find circuit
         quint32 circuitTunnelId = tunnelIds_.tunnelId(message.sender, message.circuitId);
         if(!circuits_.contains(circuitTunnelId)) {
@@ -349,6 +362,9 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
     case PeerToPeerMessage::CMD_DESTROY:
         // should only come from previous node
     {
+        if(debugLog_) {
+            qDebug() << "tunnel destroyed by source";
+        }
         TunnelState *state = findTunnelByPreviousHopId(originatorTunnelId);
         if(state != nullptr) {
             // we cannot talk to nexthop directly, originator must send destroys to all hops
@@ -423,7 +439,9 @@ void PeerToPeer::forwardEncryptedMessage(Binding to, quint16 circuitId, QByteArr
     QNetworkDatagram packet(newMessage, to.address, to.port);
     packet.setSender(interface_, port_);
     qint64 ok = socket_.writeDatagram(packet);
-    qDebug() << (ok == -1 ? QString("FAIL") : QString("OK")) << "sent packet to" << to.toString();
+    if(debugLog_) {
+        qDebug() << (ok == -1 ? QString("FAIL") : QString("OK")) << "sent packet to" << to.toString();
+    }
 }
 
 void PeerToPeer::sendPeerToPeerMessage(PeerToPeerMessage unencrypted, Binding target)
@@ -508,7 +526,10 @@ void PeerToPeer::peersArrived(int id, QList<PeerSampler::Peer> peers)
         return;
     }
 
-    qDebug() << "peersArrived ->" << peers.size();
+    if(debugLog_) {
+        qDebug() << "peersArrived ->" << peers.size();
+    }
+
     PeerSample sample = pendingPeerSamples_.take(id);
     if(sample.isBuildTunnel) {
         peers.append(sample.dest);
@@ -615,6 +636,9 @@ void PeerToPeer::disconnectPeer(Binding who)
     // tear circuits with this guy
     // tear tunnels with this guy
     // don't do anything yet so we can debug properly
+    if(debugLog_) {
+        qDebug() << "tearing connections with misbehaving peer" << who.toString();
+    }
 }
 
 PeerToPeer::TunnelState *PeerToPeer::findTunnelByPreviousHopId(quint32 tId)
@@ -637,6 +661,11 @@ PeerToPeer::TunnelState *PeerToPeer::findTunnelByNextHopId(quint32 tId)
     }
 
     return nullptr;
+}
+
+void PeerToPeer::setDebugLog(bool debugLog)
+{
+    debugLog_ = debugLog;
 }
 
 int PeerToPeer::nHops() const
@@ -751,7 +780,9 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
             return;
         }
 
-        qDebug() << "sending encrypt-once message ->" << storage.debugString;
+        if(debugLog_) {
+            qDebug() << "sending encrypt-once message ->" << storage.debugString;
+        }
         forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
         return;
     }
@@ -760,7 +791,9 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
         // a)
         if(storage.remainingHops.isEmpty()) {
             // done encrypting, send to first hop in circuit
-            qDebug() << "sending encrypt-onion message ->" << storage.debugString;
+            if(debugLog_) {
+                qDebug() << "sending encrypt-onion message ->" << storage.debugString;
+            }
             forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
             return;
         }
@@ -822,7 +855,9 @@ void PeerToPeer::onDecrypted(quint32 requestId, QByteArray payload)
             return;
         }
 
-        qDebug() << "forwarding peeled, but still encrypted packet along tunnel" << storage.nextHop.toString();
+        if(debugLog_) {
+            qDebug() << "forwarding peeled, but still encrypted packet along tunnel" << storage.nextHop.toString();
+        }
         forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
         return;
     }
@@ -887,7 +922,7 @@ void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray h
         return;
     }
 
-    qDebug() << "onSessionHS2";
+//    qDebug() << "onSessionHS2";
     quint32 peerTunnelId = incomingTunnels_.take(requestId);
     Binding previousHop;
     quint16 previousHopCircuitId;
@@ -907,7 +942,9 @@ void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray h
     PeerToPeerMessage created = PeerToPeerMessage::makeCreated(previousHopCircuitId, handshake);
     QNetworkDatagram dgram = created.toDatagram(previousHop);
     dgram.setSender(interface_, port_);
-    qDebug() << "incoming tunnel -> sent CREATED to" << previousHop.toString();
+    if(debugLog_) {
+        qDebug() << "incoming tunnel -> sent CREATED to" << previousHop.toString();
+    }
     if(socket_.writeDatagram(dgram) == -1) {
         qDebug() << "send failed ->" << socket_.error() << socket_.errorString();
     }

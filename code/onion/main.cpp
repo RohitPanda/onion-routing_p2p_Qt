@@ -1,4 +1,4 @@
-#include <QCoreApplication>
+﻿#include <QCoreApplication>
 #include "controller.h"
 
 #define ASSERT_ARG() if(args.isEmpty()) { qDebug() << "ran out of args"; parseOk = false; break; }
@@ -12,6 +12,7 @@ void printUsage()
     qDebug() << "         --polo                   to listen for marco messages and send back polos";
     qDebug() << "         --host <ip>              override config onion p2p host with <ip>";
     qDebug() << "         --port <port>            override config onion p2p port with <port>";
+    qDebug() << "         -v --verbose             excessive logging";
 }
 
 Binding parse(QString peer) {
@@ -56,6 +57,7 @@ int main(int argc, char *argv[])
     bool polo = false;
     QHostAddress overrideAddress;
     int overridePort = -1;
+    bool verbose = false;
 
     while(!args.isEmpty()) {
         QString arg = args.takeFirst();
@@ -88,6 +90,8 @@ int main(int argc, char *argv[])
         } else if(arg == "--port") {
             ASSERT_ARG();
             overridePort = args.takeFirst().toInt();
+        } else if(arg == "-v" || arg == "--verbose") {
+            verbose = true;
         }
     }
 
@@ -110,6 +114,7 @@ int main(int argc, char *argv[])
     controller.setMarcoPolo(marco, polo);
     controller.setMockOauth(mockOAuth);
     controller.setMockPeers(mockPeers);
+    controller.setVerbose(verbose);
 
     if(!controller.start()) {
         return -1;
