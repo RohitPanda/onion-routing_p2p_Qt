@@ -113,7 +113,7 @@ void OnionApi::sendTunnelIncoming(quint32 tunnelId)
 void OnionApi::sendTunnelData(quint32 tunnelId, QByteArray data)
 {
     if(!tunnelMapping_.contains(tunnelId)) {
-        qDebug() << "No mapping entry for tunnelId" << tunnelId << "not destroying dangling tunnel..";
+        qDebug() << "No mapping entry for tunnelId" << tunnelId << "not destroying dangling tunnel, it might have been created by someone else.";
         return;
     }
 
