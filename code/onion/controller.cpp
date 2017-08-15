@@ -2,6 +2,7 @@
 
 #include <QFileInfo>
 #include <QDir>
+#include "mockpeersampler.h"
 
 Controller::Controller(QString configFile) :
     settingsFile_(configFile), settings_(configFile)
@@ -32,7 +33,14 @@ bool Controller::start()
     oAuthApi_.setHost(settings_.authApiAddress().address, settings_.authApiAddress().port);
 
     // setup peersampler
-    rpsApiProxy_.setRpsApi(&rpsApi_);
+    if(mockRPS()) {
+        MockPeerSampler *mps = new MockPeerSampler(this);
+        mps->setMockPeers(mockPeers_);
+        rpsApiProxy_ = mps;
+    } else {
+        rpsApiProxy_ = new PeerSampler(this);
+        rpsApiProxy_->setRpsApi(&rpsApi_);
+    }
 
     // setup p2p
     Binding p2pAddr = settings_.p2pAddress();
@@ -48,7 +56,7 @@ bool Controller::start()
     p2p_.setNHops(2);
 
     // connect to rps api
-    p2p_.setPeerSampler(&rpsApiProxy_);
+    p2p_.setPeerSampler(rpsApiProxy_);
 
     // connect to onion api
     connect(&onionApi_, &OnionApi::requestBuildTunnel, &p2p_, &PeerToPeer::buildTunnel);
@@ -110,7 +118,9 @@ bool Controller::start()
 
     oAuthApi_.start();
 
-    rpsApi_.start();
+    if(!mockRPS()) {
+        rpsApi_.start();
+    }
 
     return true;
 }

@@ -24,6 +24,8 @@ public:
     void setMarcoPolo(Binding marco, bool polo);
 
 private:
+    bool mockRPS() const { return !mockPeers_.isEmpty(); }
+
     QByteArray readHostkey(QString file);
 
     OnionApi onionApi_;
@@ -31,7 +33,7 @@ private:
     RPSApi rpsApi_;
     OAuthApi oAuthApi_;
 
-    PeerSampler rpsApiProxy_;
+    PeerSampler *rpsApiProxy_ = nullptr;
 
     QByteArray hostkey_;
 

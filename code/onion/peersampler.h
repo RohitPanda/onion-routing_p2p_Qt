@@ -12,8 +12,8 @@ class PeerSampler : public QObject
 public:
     explicit PeerSampler(QObject *parent = 0);
 
-    int requestPeers(int n);
-    void setRpsApi(RPSApi *api);
+    virtual int requestPeers(int n);
+    virtual void setRpsApi(RPSApi *api);
 
     struct Peer {
         Binding address;
@@ -23,7 +23,7 @@ signals:
     void peersArrived(int id, QList<Peer> peers);
     void requestPeer();
 
-private slots:
+protected slots:
     void onPeer(QHostAddress address, quint16 port, QByteArray hostkey);
     void requestLoop();
 
