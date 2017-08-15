@@ -1,2 +1,4 @@
 *.pro.user
 code/build-onion-*/
+
+code/log_*\.txt
