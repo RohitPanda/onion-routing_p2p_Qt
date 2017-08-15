@@ -69,7 +69,7 @@ test{
         tests/onionapitester.h \
         tests/rpsapitester.h \
         tests/peertopeermessagetester.h \
-        tests/oauthapitester.h#
+        tests/oauthapitester.h
 } else {
     SOURCES += main.cpp
 }

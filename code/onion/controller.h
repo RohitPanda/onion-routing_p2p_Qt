@@ -17,6 +17,12 @@ public:
 
     bool start();
 
+    void setOverrideHost(QHostAddress address);
+    void setOverridePort(int port);
+    void setMockPeers(QList<Binding> peers);
+    void setMockOauth(bool enable);
+    void setMarcoPolo(Binding marco, bool polo);
+
 private:
     QByteArray readHostkey(QString file);
 
@@ -31,6 +37,13 @@ private:
 
     QString settingsFile_;
     Settings settings_;
+
+    QHostAddress overrideHost_;
+    int overridePort_ = -1;
+    QList<Binding> mockPeers_;
+    bool mockOAuth_ = false;
+    Binding marco_;
+    bool polo_ = false;
 };
 
 #endif // CONTROLLER_H

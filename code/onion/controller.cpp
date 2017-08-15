@@ -36,6 +36,13 @@ bool Controller::start()
 
     // setup p2p
     Binding p2pAddr = settings_.p2pAddress();
+    if(!overrideHost_.isNull()) {
+        p2pAddr.address = overrideHost_;
+    }
+    if(overridePort_ > 0 && overridePort_ <= 65535) {
+        p2pAddr.port = overridePort_;
+    }
+
     p2p_.setInterface(p2pAddr.address);
     p2p_.setPort(p2pAddr.port);
     p2p_.setNHops(2);
@@ -106,6 +113,32 @@ bool Controller::start()
     rpsApi_.start();
 
     return true;
+}
+
+void Controller::setOverrideHost(QHostAddress address)
+{
+    overrideHost_ = address;
+}
+
+void Controller::setOverridePort(int port)
+{
+    overridePort_ = port;
+}
+
+void Controller::setMockPeers(QList<Binding> peers)
+{
+    mockPeers_ = peers;
+}
+
+void Controller::setMockOauth(bool enable)
+{
+    mockOAuth_ = enable;
+}
+
+void Controller::setMarcoPolo(Binding marco, bool polo)
+{
+    marco_ = marco;
+    polo_ = polo;
 }
 
 QByteArray Controller::readHostkey(QString file)
