@@ -15,7 +15,7 @@ struct Binding {
     bool isValid() const { return !address.isNull() && port != 0; }
 
     bool operator ==(const Binding &other) const {
-        return address == other.address && port == other.port;
+        return address.isEqual(other.address, QHostAddress::TolerantConversion) && port == other.port;
     }
 };
 
