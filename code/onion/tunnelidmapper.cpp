@@ -13,7 +13,9 @@ quint32 TunnelIdMapper::tunnelId(Binding binding, quint16 circId)
 quint32 TunnelIdMapper::tunnelId(TunnelIdMapper::CircuitBinding id)
 {
     if(!forward_.contains(id)) {
-        forward_[id] = nextTunnelId_++;
+        quint32 tid = nextTunnelId_++;
+        forward_[id] = tid;
+        backward_[tid] = id;
     }
 
     return forward_[id];

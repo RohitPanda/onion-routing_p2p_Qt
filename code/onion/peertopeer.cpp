@@ -29,11 +29,16 @@ void PeerToPeer::setPort(int port)
 
 bool PeerToPeer::start()
 {
-    return socket_.bind(port_);
+    bool ok = socket_.bind(port_);
+    if(!ok) {
+        qDebug() << "p2p api failed to bind" << socket_.error() << socket_.errorString();
+    }
+    return ok;
 }
 
 void PeerToPeer::onDatagram()
 {
+    qDebug() << "onDatagram";
     while (socket_.hasPendingDatagrams()) {
         handleDatagram(socket_.receiveDatagram());
     }
@@ -42,7 +47,7 @@ void PeerToPeer::onDatagram()
 void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
 {
     if(!datagram.isValid()) {
-        qDebug() << "error receiving p2p datagram.";
+        qDebug() << "error receiving p2p datagram." << socket_.error() << socket_.errorString();
         return;
     }
 
@@ -133,7 +138,7 @@ void PeerToPeer::handleDatagram(QNetworkDatagram datagram)
 
         // decrypt with K_src,us,
         // which is the key associated with tunnelIdPreviousHop
-        if(!sessions_.has(state->tunnelIdPreviousHop) || !state->hasNextHop()) {
+        if(!sessions_.has(state->tunnelIdPreviousHop)) {
             qDebug() << "broken tunnel: no session with source or no nexthop for tunnel"
                      << state->previousHop.toString() << "<-> us <->"
                      << state->nextHop.toString();
@@ -180,6 +185,7 @@ void PeerToPeer::handleBuild(PeerToPeerMessage message)
 {
     // incoming tunnel
     // send handshake to auth to build us a session
+    qDebug() << "handleBuild";
     quint32 reqId = nextAuthRequest_++;
     incomingTunnels_[reqId] = tunnelIds_.tunnelId(message.sender, message.circuitId);
     sessionIncomingHS1(reqId, message.data);
@@ -191,6 +197,7 @@ void PeerToPeer::handleCreated(PeerToPeerMessage message)
     // nexthop established
     // a) part of a circuit we initiated
     // b) part of an incomming tunnel, i.e. an earlier relay_extend
+    qDebug() << "handleCreated";
     quint32 nextHopTunnelId = tunnelIds_.tunnelId(message.sender, message.circuitId);
     if(pendingTunnelExtensions_.contains(nextHopTunnelId)) {
         // b)
@@ -206,6 +213,7 @@ void PeerToPeer::handleCreated(PeerToPeerMessage message)
 
         state->tunnelIdNextHop = nextHopTunnelId;
         state->nextHop = message.sender;
+        state->circIdNextHop = message.circuitId;
 
         // send relay_extended with handshake response
         PeerToPeerMessage msg = PeerToPeerMessage::makeRelayExtended(state->circIdPreviousHop, 0, message.data);
@@ -260,6 +268,7 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
         // send build with handshake we got
         PeerToPeerMessage build = PeerToPeerMessage::makeBuild(nextHopCircuitId, message.data);
         QNetworkDatagram dgram = build.toDatagram(nexthop); // cant encrypt this message, directly send
+        dgram.setSender(interface_, port_);
         qDebug() << "RELAY_EXTEND -> sending build to" << nexthop.toString();
         socket_.writeDatagram(dgram);
         // await created, then send relay_extended
@@ -289,6 +298,8 @@ void PeerToPeer::handleMessage(PeerToPeerMessage message, quint32 originatorTunn
                                  << "but is" << tunnelIds_.describe(originatorTunnelId);
                     }
                 }
+
+                qDebug() << "Tunnel extended successfully until" << hopState.peer.toString();
 
                 // finish session establishment
                 sessionIncomingHS2(nextAuthRequest_++, hopState.sessionKey, message.data);
@@ -491,6 +502,8 @@ void PeerToPeer::peersArrived(int id, QList<PeerSampler::Peer> peers)
         qDebug() << "peersArrived: unknown sample id";
         return;
     }
+
+    qDebug() << "peersArrived ->" << peers.size();
     PeerSample sample = pendingPeerSamples_.take(id);
     if(sample.isBuildTunnel) {
         peers.append(sample.dest);
@@ -557,6 +570,7 @@ void PeerToPeer::continueBuildingTunnel(quint32 id)
         // send a build
         PeerToPeerMessage build = PeerToPeerMessage::makeBuild(circId, nextHopState.peerHandshakeHS1);
         QNetworkDatagram dgram = build.toDatagram(nextHopState.peer);
+        dgram.setSender(interface_, port_);
         qDebug() << "building circuit -> sent build to" << nextHopState.peer.toString();
         socket_.writeDatagram(dgram);
     } else {
@@ -692,6 +706,15 @@ bool PeerToPeer::sendData(quint32 tunnelId, QByteArray data)
         }
     }
 
+    // find backwards-tunnel with start-us tunnelid
+    TunnelState *tunnel = findTunnelByPreviousHopId(tunnelId);
+    if(tunnel != nullptr) {
+        PeerToPeerMessage message = PeerToPeerMessage::makeRelayData(tunnel->circIdPreviousHop, 0, data);
+        sendPeerToPeerMessage(message, tunnel->previousHop);
+        return true;
+    }
+
+    qDebug() << "failed to send data along tunnel" << tunnelId;
     return false;
 }
 
@@ -734,6 +757,7 @@ void PeerToPeer::onEncrypted(quint32 requestId, quint16 sessionId, QByteArray pa
             // done encrypting, send to first hop in circuit
             qDebug() << "sending encrypt-onion message ->" << storage.debugString;
             forwardEncryptedMessage(storage.nextHop, storage.nextHopCircuitId, payload);
+            return;
         }
 
         // more layers to come, encrypt it further
@@ -858,6 +882,7 @@ void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray h
         return;
     }
 
+    qDebug() << "onSessionHS2";
     quint32 peerTunnelId = incomingTunnels_.take(requestId);
     Binding previousHop;
     quint16 previousHopCircuitId;
@@ -871,11 +896,16 @@ void PeerToPeer::onSessionHS2(quint32 requestId, quint16 sessionId, QByteArray h
     // setup session established with other side
     sessions_.set(peerTunnelId, sessionId);
 
+    tunnels_.append(newTunnel);
+
     // send back handshake in a CREATED message
     PeerToPeerMessage created = PeerToPeerMessage::makeCreated(previousHopCircuitId, handshake);
     QNetworkDatagram dgram = created.toDatagram(previousHop);
+    dgram.setSender(interface_, port_);
     qDebug() << "incoming tunnel -> sent CREATED to" << previousHop.toString();
-    socket_.writeDatagram(dgram);
+    if(socket_.writeDatagram(dgram) == -1) {
+        qDebug() << "send failed ->" << socket_.error() << socket_.errorString();
+    }
 
     // announce tunnel
     tunnelIncoming(peerTunnelId);
