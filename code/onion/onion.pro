@@ -23,7 +23,8 @@ SOURCES += \
     tunnelidmapper.cpp \
     oauthapi.cpp \
     peersampler.cpp \
-    mockpeersampler.cpp
+    mockpeersampler.cpp \
+    mockoauthapi.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -50,7 +51,8 @@ HEADERS += \
     tunnelidmapper.h \
     oauthapi.h \
     peersampler.h \
-    mockpeersampler.h
+    mockpeersampler.h \
+    mockoauthapi.h
 
 test{
 #    message(Configuring test build...)

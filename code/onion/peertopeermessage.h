@@ -25,12 +25,12 @@
 // celltype can be CMD_DESTROY, RELAY_DATA, RELAY_EXTEND, RELAY_EXTENDED, RELAY_TRUNCATED
 //
 // command payload:
-// | 03 | CMD_DESTROY     | digest (4B) | reserved (2B) // to fit header size
-// | 03 | CMD_COVER       | digest (4B) | reserved (2B) // to fit header size
-// | 03 | RELAY_DATA      | digest (4B) | streamId (2B) | data_size (2B) | data
-// | 03 | RELAY_EXTEND    | digest (4B) | streamId (2B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
-// | 03 | RELAY_EXTENDED  | digest (4B) | streamId (2B) | handshake_len (2B) | handshake
-// | 03 | RELAY_TRUNCATED | digest (4B) | streamId (2B) | --
+// | CMD_DESTROY     | digest (4B) | reserved (2B) // to fit header size
+// | CMD_COVER       | digest (4B) | reserved (2B) // to fit header size
+// | RELAY_DATA      | digest (4B) | streamId (2B) | data_size (2B) | data
+// | RELAY_EXTEND    | digest (4B) | streamId (2B) | ip_v (1B) | ip (4B/16B) | port (2B) | handshake_len (2B) | handshake
+// | RELAY_EXTENDED  | digest (4B) | streamId (2B) | handshake_len (2B) | handshake
+// | RELAY_TRUNCATED | digest (4B) | streamId (2B) | --
 
 class PeerToPeerMessage
 {

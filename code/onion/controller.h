@@ -31,7 +31,7 @@ private:
     OnionApi onionApi_;
     PeerToPeer p2p_;
     RPSApi rpsApi_;
-    OAuthApi oAuthApi_;
+    OAuthApi *oAuthApi_ = nullptr;
 
     PeerSampler *rpsApiProxy_ = nullptr;
 
