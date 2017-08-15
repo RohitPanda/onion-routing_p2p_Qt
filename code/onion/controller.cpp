@@ -1,5 +1,6 @@
 #include "controller.h"
 #include "mockoauthapi.h"
+#include "marcopolo.h"
 
 #include <QFileInfo>
 #include <QDir>
@@ -89,6 +90,7 @@ bool Controller::start()
     connect(&p2p_, &PeerToPeer::requestLayeredEncrypt, oAuthApi_, &OAuthApi::requestAuthLayerEncrypt);
     connect(&p2p_, &PeerToPeer::requestLayeredDecrypt, oAuthApi_, &OAuthApi::requestAuthLayerDecrypt);
 
+    setupMarcoPolo();
 
 //    bool debugOnion = true;
 //    if(debugOnion) {
@@ -157,6 +159,27 @@ void Controller::setMarcoPolo(Binding marco, bool polo)
 {
     marco_ = marco;
     polo_ = polo;
+}
+
+void Controller::setupMarcoPolo()
+{
+    if(marco_.isValid() || polo_) {
+        MarcoPolo *marcopolo = new MarcoPolo(this);
+        marcopolo->setMarco(marco_);
+        marcopolo->setPolo(polo_);
+
+        // marcopolo connects onionapi-lik
+        connect(marcopolo, &MarcoPolo::requestBuildTunnel, &p2p_, &PeerToPeer::buildTunnel);
+        connect(marcopolo, &MarcoPolo::requestDestroyTunnel, &p2p_, &PeerToPeer::destroyTunnel);
+        connect(marcopolo, &MarcoPolo::requestSendTunnel, &p2p_, &PeerToPeer::sendData);
+        connect(marcopolo, &MarcoPolo::requestBuildCoverTunnel, &p2p_, &PeerToPeer::coverTunnel);
+        connect(&p2p_, &PeerToPeer::tunnelReady, marcopolo, &MarcoPolo::onTunnelReady);
+        connect(&p2p_, &PeerToPeer::tunnelIncoming, marcopolo, &MarcoPolo::onTunnelIncoming);
+        connect(&p2p_, &PeerToPeer::tunnelData, marcopolo, &MarcoPolo::onTunnelData);
+        connect(&p2p_, &PeerToPeer::tunnelError, marcopolo, &MarcoPolo::onTunnelError);
+
+        marcopolo->start();
+    }
 }
 
 QByteArray Controller::readHostkey(QString file)

@@ -24,7 +24,8 @@ SOURCES += \
     oauthapi.cpp \
     peersampler.cpp \
     mockpeersampler.cpp \
-    mockoauthapi.cpp
+    mockoauthapi.cpp \
+    marcopolo.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -52,7 +53,8 @@ HEADERS += \
     oauthapi.h \
     peersampler.h \
     mockpeersampler.h \
-    mockoauthapi.h
+    mockoauthapi.h \
+    marcopolo.h
 
 test{
 #    message(Configuring test build...)
