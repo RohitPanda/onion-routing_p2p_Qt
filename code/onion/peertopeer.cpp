@@ -510,6 +510,7 @@ void PeerToPeer::cleanCircuit(quint32 tunnelId)
     }
 
     CircuitState state = circuits_.take(tunnelId);
+    state.retryEstablishingTimer->deleteLater();
     for(HopState hop : state.hopStates) {
         if(hop.status == Created) {
             // clear auth sessions
@@ -556,7 +557,7 @@ void PeerToPeer::peersArrived(int id, QList<PeerSampler::Peer> peers)
     }
 }
 
-void PeerToPeer::continueBuildingTunnel(quint32 id)
+void PeerToPeer::continueBuildingTunnel(quint32 id, bool isRetry)
 {
     if(!circuits_.contains(id)) {
         return;
@@ -569,8 +570,13 @@ void PeerToPeer::continueBuildingTunnel(quint32 id)
         if(hop.status == Created) {
             continue;
         } else if(hop.status == BuildSent) {
-            // wait more
-            return;
+            if(isRetry) {
+                nextBuildIndex = i;
+                break;
+            } else {
+                // wait more
+                return;
+            }
         } else {
             // establish with this hop
             nextBuildIndex = i;
@@ -580,6 +586,7 @@ void PeerToPeer::continueBuildingTunnel(quint32 id)
 
     if(nextBuildIndex == -1) {
         // tunnel is ready
+        state.retryEstablishingTimer->stop();
         if(state.remainingCoverData > 0) {
             sendCoverData(id);
         } else {
@@ -605,6 +612,9 @@ void PeerToPeer::continueBuildingTunnel(quint32 id)
         PeerToPeerMessage extend = PeerToPeerMessage::makeRelayExtend(circId, 0, nextHopState.peer, nextHopState.peerHandshakeHS1);
         sendPeerToPeerMessage(extend, halfOnion);
     }
+
+    // start retry timer
+    state.retryEstablishingTimer->start();
 }
 
 void PeerToPeer::sendCoverData(quint32 tunnelId)
@@ -904,10 +914,18 @@ void PeerToPeer::onSessionHS1(quint32 requestId, quint16 sessionId, QByteArray h
             circuit.circuitApiTunnelId = circuit.hopStates.last().tunnelId;
             circuit.lastMessage = it->isBuildTunnel ? MessageType::ONION_TUNNEL_BUILD : MessageType::ONION_COVER;
             circuit.remainingCoverData = it->isBuildTunnel ? 0 : it->coverTrafficBytes;
+
             quint32 circuitId = circuit.hopStates.first().tunnelId;
+
+            // setup retry timer
+            QTimer *retry = new QTimer(this);
+            retry->setSingleShot(true);
+            retry->setInterval(20000); // 20 secs
+            connect(retry, &QTimer::timeout, this, [=]() { continueBuildingTunnel(circuitId, true); });
+            circuit.retryEstablishingTimer = retry;
+
             circuits_[circuitId] = circuit;
             continueBuildingTunnel(circuitId);
-
             it = pendingCircuitHandshakes_.erase(it);
         } else {
             it++;

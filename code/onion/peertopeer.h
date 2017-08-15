@@ -99,6 +99,7 @@ private:    // structs
 
         int remainingCoverData = 0; // if this is a cover tunnel
         QTcpSocket *requesterId = nullptr;
+        QTimer *retryEstablishingTimer = nullptr;
     };
 
     struct TunnelState {
@@ -179,7 +180,7 @@ private slots:
     void cleanCircuit(quint32 tunnelId); // cleans up resources
 
     void peersArrived(int id, QList<PeerSampler::Peer> peers);
-    void continueBuildingTunnel(quint32 id);
+    void continueBuildingTunnel(quint32 id, bool isRetry = false);
     void sendCoverData(quint32 tunnelId);
 
     void disconnectPeer(Binding who);
