@@ -66,14 +66,16 @@ bool Controller::start()
     p2p_.setPeerSampler(rpsApiProxy_);
 
     // connect to onion api
-    connect(&onionApi_, &OnionApi::requestBuildTunnel, &p2p_, &PeerToPeer::buildTunnel);
-    connect(&onionApi_, &OnionApi::requestDestroyTunnel, &p2p_, &PeerToPeer::destroyTunnel);
-    connect(&onionApi_, &OnionApi::requestSendTunnel, &p2p_, &PeerToPeer::sendData);
-    connect(&onionApi_, &OnionApi::requestBuildCoverTunnel, &p2p_, &PeerToPeer::coverTunnel);
-    connect(&p2p_, &PeerToPeer::tunnelReady, &onionApi_, &OnionApi::sendTunnelReady);
-    connect(&p2p_, &PeerToPeer::tunnelIncoming, &onionApi_, &OnionApi::sendTunnelIncoming);
-    connect(&p2p_, &PeerToPeer::tunnelData, &onionApi_, &OnionApi::sendTunnelData);
-    connect(&p2p_, &PeerToPeer::tunnelError, &onionApi_, &OnionApi::sendTunnelError);
+    if(!marcoPolo()) {
+        connect(&onionApi_, &OnionApi::requestBuildTunnel, &p2p_, &PeerToPeer::buildTunnel);
+        connect(&onionApi_, &OnionApi::requestDestroyTunnel, &p2p_, &PeerToPeer::destroyTunnel);
+        connect(&onionApi_, &OnionApi::requestSendTunnel, &p2p_, &PeerToPeer::sendData);
+        connect(&onionApi_, &OnionApi::requestBuildCoverTunnel, &p2p_, &PeerToPeer::coverTunnel);
+        connect(&p2p_, &PeerToPeer::tunnelReady, &onionApi_, &OnionApi::sendTunnelReady);
+        connect(&p2p_, &PeerToPeer::tunnelIncoming, &onionApi_, &OnionApi::sendTunnelIncoming);
+        connect(&p2p_, &PeerToPeer::tunnelData, &onionApi_, &OnionApi::sendTunnelData);
+        connect(&p2p_, &PeerToPeer::tunnelError, &onionApi_, &OnionApi::sendTunnelError);
+    }
 
     // connect to oauth api
     connect(oAuthApi_, &OAuthApi::recvSessionHS1, &p2p_, &PeerToPeer::onSessionHS1);
@@ -110,15 +112,17 @@ bool Controller::start()
 //    }
 
     // start everything
-    if(onionApi_.start()) {
-        qDebug() << "onion api running on" << settings_.onionApiAddress().toString();
-    } else {
-        qDebug() << "could not start onion api:" << onionApi_.socketError();
-        return false;
+    if(!marcoPolo()) {
+        if(onionApi_.start()) {
+            qDebug() << "onion api running on" << settings_.onionApiAddress().toString();
+        } else {
+            qDebug() << "could not start onion api:" << onionApi_.socketError();
+            return false;
+        }
     }
 
     if(p2p_.start()) {
-        qDebug() << "p2p running on" << settings_.onionApiAddress().toString();
+        qDebug() << "p2p running on" << settings_.p2pAddress().toString();
     } else {
         qDebug() << "could not start p2p";
         return false;
@@ -163,7 +167,7 @@ void Controller::setMarcoPolo(Binding marco, bool polo)
 
 void Controller::setupMarcoPolo()
 {
-    if(marco_.isValid() || polo_) {
+    if(marcoPolo()) {
         MarcoPolo *marcopolo = new MarcoPolo(this);
         marcopolo->setMarco(marco_);
         marcopolo->setPolo(polo_);

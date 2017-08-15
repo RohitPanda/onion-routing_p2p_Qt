@@ -25,6 +25,7 @@ public:
 
 private:
     bool mockRPS() const { return !mockPeers_.isEmpty(); }
+    bool marcoPolo() const { return marco_.isValid() || polo_; }
     void setupMarcoPolo();
 
     QByteArray readHostkey(QString file);

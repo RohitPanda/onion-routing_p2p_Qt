@@ -7,7 +7,7 @@ void printUsage()
 {
     qDebug() << "onion -c [configfile]";
     qDebug() << "options: --mock-peer <ip>:<port>  to fake peers instead of an rps module";
-    qDebug() << "         --mock-oatuh             to use fake onion auth instead of module";
+    qDebug() << "         --mock-auth              to use fake onion auth instead of module";
     qDebug() << "         --marco <ip>:<port>      to connect to <peer> and send marco messages";
     qDebug() << "         --polo                   to listen for marco messages and send back polos";
     qDebug() << "         --host <ip>              override config onion p2p host with <ip>";
